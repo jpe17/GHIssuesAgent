@@ -19,19 +19,13 @@ GHIssuesAgent/
 │   ├── static/             # CSS, JS, images
 │   ├── templates/          # HTML templates
 │   └── routes.py           # FastAPI routes
-├── tests/                  # Comprehensive test suite
+├── tests/                  # Test suite
 │   ├── __init__.py
-│   ├── conftest.py         # Pytest configuration & fixtures
 │   ├── test_config.py      # Configuration tests
-│   ├── test_session_manager.py # Session management tests
-│   ├── test_issues_service.py # Issues service tests
-│   ├── test_repository_scanner.py # Repository scanner tests
-│   ├── test_issue_analyzer.py # Issue analyzer tests
-│   ├── test_integration.py # Integration tests
-│   └── run_tests.py        # Test runner script
+│   └── test_api_functions.py # Real API integration tests
 ├── main.py                 # FastAPI application entry point
-├── test_devin.py          # Quick integration test script
-└── requirements.txt       # Python dependencies
+├── requirements.txt        # Python dependencies
+└── Dockerfile             # Container configuration
 ```
 
 ## 🚀 Features
@@ -39,7 +33,7 @@ GHIssuesAgent/
 - **Two-Phase Analysis**: Smart repository scanning followed by targeted deep analysis
 - **Session-Based API**: Robust Devin API integration with proper session management
 - **Modular Design**: Clean separation of concerns for maintainability
-- **Comprehensive Testing**: Full test coverage for all components
+- **Real API Testing**: Direct integration tests with actual Devin API
 - **Web Interface**: User-friendly FastAPI web application
 
 ## 🛠️ Setup
@@ -73,25 +67,30 @@ GHIssuesAgent/
 
 ### Run All Tests
 ```bash
-python tests/run_tests.py
-```
-
-### Run Specific Test File
-```bash
-python tests/run_tests.py test_issues_service.py
-```
-
-### Run Tests with Pytest Directly
-```bash
 pytest tests/ -v
+```
+
+### Run Individual Test Files
+Each test file can be run independently:
+
+```bash
+# Test configuration
+pytest tests/test_config.py -v
+
+# Test API functions with real Devin API
+pytest tests/test_api_functions.py -v -s
 ```
 
 ### Test Coverage
 The test suite includes:
-- **Unit Tests**: Individual component testing
-- **Integration Tests**: End-to-end workflow testing
-- **Error Handling**: Edge cases and failure scenarios
-- **Mock Testing**: Isolated testing without external dependencies
+- **Configuration Tests**: Environment variables and API key validation
+- **Real API Integration Tests**: Direct calls to Devin API with actual responses
+- **Workflow Tests**: Complete end-to-end testing of the application flow
+
+### Testing Philosophy
+- **Real API Calls**: Tests use actual Devin API to validate functionality
+- **Basic Validation**: Focus on structure and basic functionality rather than exact content
+- **Simple & Direct**: Each test file is self-contained and runnable independently
 
 ## 📋 API Components
 
@@ -165,7 +164,7 @@ The test suite includes:
 ### Code Organization
 - **Business Logic**: All in `api/` directory
 - **Web Interface**: All in `app/` directory
-- **Tests**: Comprehensive coverage in `tests/` directory
+- **Tests**: Real API integration tests in `tests/` directory
 - **Configuration**: Centralized in `api/config.py`
 
 ## 📝 Environment Variables
@@ -177,7 +176,7 @@ The test suite includes:
 ## 🤝 Contributing
 
 1. Follow the modular architecture
-2. Add tests for new features
+2. Add tests for new features using real API calls
 3. Ensure all tests pass
 4. Update documentation as needed
 
