@@ -2,10 +2,9 @@
 
 import json
 import os
-import re
 from typing import Dict, List
-from core.session_manager import create_devin_session, wait_for_session_completion
-from utils.utils import extract_json_from_attachments, extract_json_from_message_content, get_cache_key
+from core.session_manager import create_devin_session, wait_for_session_completion, upload_file
+from utils.utils import get_cache_key, download_json_attachments
 from utils.config import FULL_ANALYSIS_TIMEOUT
 
 
@@ -28,20 +27,20 @@ class FeasibilityAnalyzerAgent:
             with open(cache_file, 'r') as f:
                 return json.load(f)
         
+        # Upload issue file and get URL
+        file_url = self._upload_issue_file(repo_url, issue_number)
+        
         # Analyze with Devin
         prompt = f"""
-        Analyze this GitHub issue for feasibility and complexity:
+        Analyze this GitHub issue for feasibility and complexity.
         
         Repository: {repo_url}
-        Issue #{issue_number}:
-        Title: {issue.get('title', 'No title')}
-        Body: {issue.get('body', 'No description')}
-        Labels: {issue.get('labels', [])}
+        Issue file: {file_url}
         
         IMPORTANT: 
         1. Complete the task fully - do not wait for further instructions
         2. Mark the task as complete when done
-        3. Save results as JSON attachment if possible
+        3. Save the analysis as JSON attachment named "analysis.json"
         
         Provide a comprehensive analysis as JSON:
         
@@ -62,14 +61,21 @@ class FeasibilityAnalyzerAgent:
         
         Return as JSON with keys: feasibility_score, complexity_score, scope_assessment, 
         technical_analysis, effort_estimation, confidence
-        Complete the task and mark as done.
+        
+        Save the analysis as "analysis.json" attachment and mark the task as done.
         """
         
         session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(session_id, timeout=FULL_ANALYSIS_TIMEOUT)
+        result = wait_for_session_completion(session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
         
-        # Extract analysis data
-        analysis_data = self._extract_analysis_data(result)
+        # Extract analysis data using utils
+        message_attachments = result.get("message_attachments", [])
+        downloaded_files = download_json_attachments(message_attachments, "analysis")
+        
+        if not downloaded_files:
+            raise ValueError("No analysis JSON file found in Devin session result")
+        
+        analysis_data = downloaded_files[0]["data"]
         
         # Add issue metadata
         analysis_data.update({
@@ -86,87 +92,28 @@ class FeasibilityAnalyzerAgent:
         
         return analysis_data
     
+    def _upload_issue_file(self, repo_url: str, issue_number: str) -> str:
+        """Upload issue file and return URL."""
+        from utils.utils import get_issue_file_path
+        issue_file_path = get_issue_file_path(self.cache_dir, repo_url, issue_number)
+        
+        if not os.path.exists(issue_file_path):
+            raise FileNotFoundError(f"Issue file not found: {issue_file_path}")
+        
+        file_url = upload_file(issue_file_path)
+        print(f"Uploaded issue file: {file_url}")
+        return file_url
+    
     def analyze_multiple_issues(self, issues: List[Dict], repo_url: str) -> List[Dict]:
         """Analyze multiple issues and return sorted by feasibility."""
         print(f"Agent 2: Analyzing {len(issues)} issues for feasibility")
         
         results = []
         for issue in issues:
-            try:
-                analysis = self.analyze_issue_feasibility(issue, repo_url)
-                results.append(analysis)
-            except Exception as e:
-                print(f"Error analyzing issue #{issue.get('number', 'unknown')}: {e}")
-                # Add fallback analysis
-                results.append({
-                    "issue_number": issue.get("number", "unknown"),
-                    "issue_title": issue.get("title", ""),
-                    "feasibility_score": 0,
-                    "complexity_score": 100,
-                    "confidence": 0,
-                    "error": str(e)
-                })
+            analysis = self.analyze_issue_feasibility(issue, repo_url)
+            results.append(analysis)
         
         # Sort by feasibility score (highest first)
         results.sort(key=lambda x: x.get("feasibility_score", 0), reverse=True)
         
-        return results
-    
-    def _extract_analysis_data(self, result: Dict) -> Dict:
-        """Extract analysis data from Devin session result."""
-        # Try attachments first (same as Agent 1)
-        attachments = result.get("attachments", [])
-        print(f"Found {len(attachments)} attachments")
-        if attachments:
-            json_data = extract_json_from_attachments(attachments)
-            if json_data and isinstance(json_data, dict):
-                print("Extracted JSON from attachments")
-                return json_data
-        
-        # Try message attachments (same as Agent 1)
-        message_attachments = result.get("message_attachments", [])
-        print(f"Found {len(message_attachments)} message attachments")
-        if message_attachments:
-            json_data = extract_json_from_attachments(message_attachments)
-            if json_data and isinstance(json_data, dict):
-                print("Extracted JSON from message attachments")
-                return json_data
-        
-        # Try to parse the analysis from the message text
-        messages = result.get("messages", [])
-        for message in reversed(messages):
-            if message.get("type") == "devin_message":
-                content = message.get("message", "")
-                # Look for feasibility score in the text
-                if "Feasibility Score:" in content:
-                    try:
-                        # Extract scores from text
-                        feasibility_match = re.search(r'Feasibility Score:\s*(\d+)', content)
-                        complexity_match = re.search(r'Complexity Score:\s*(\d+)', content)
-                        hours_match = re.search(r'Estimated Effort:\s*(\d+)', content)
-                        
-                        if feasibility_match and complexity_match:
-                            return {
-                                "feasibility_score": int(feasibility_match.group(1)),
-                                "complexity_score": int(complexity_match.group(1)),
-                                "confidence": 80,  # High confidence if we found scores
-                                "scope_assessment": {"size": "Small", "impact": "Local"},
-                                "technical_analysis": {"estimated_files": [], "dependencies": [], "risks": []},
-                                "effort_estimation": {
-                                    "hours": int(hours_match.group(1)) if hours_match else 8,
-                                    "testing": "Basic",
-                                    "documentation": "Minimal"
-                                }
-                            }
-                    except:
-                        pass
-        
-        # Return default analysis if nothing found
-        return {
-            "feasibility_score": 50,
-            "complexity_score": 50,
-            "confidence": 0,
-            "scope_assessment": {"size": "Medium", "impact": "Local"},
-            "technical_analysis": {"estimated_files": [], "dependencies": [], "risks": []},
-            "effort_estimation": {"hours": 8, "testing": "Basic", "documentation": "Minimal"}
-        } 
+        return results 

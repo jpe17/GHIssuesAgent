@@ -2,134 +2,15 @@
 """Agents 2 & 3: Analyze and execute for a specific issue."""
 
 import sys
-import json
 import os
-import threading
-import time
-import signal
-from queue import Queue
+import json
 
 # Add the parent directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.utils import get_cache_key
-from agents.agent1_issue_fetcher import IssueFetcherAgent
 from agents.agent2_feasibility_analyzer import FeasibilityAnalyzerAgent
 from agents.agent3_file_reviewer import FileReviewerAgent
-
-
-def run_agent_2(agent2, issue, repo_url, result_queue):
-    """Run Agent 2 in a separate thread."""
-    try:
-        analysis = agent2.analyze_issue_feasibility(issue, repo_url)
-        result_queue.put(("agent2", analysis, None))
-    except Exception as e:
-        result_queue.put(("agent2", None, e))
-
-
-def run_agent_3(agent3, issue, repo_url, result_queue):
-    """Run Agent 3 in a separate thread."""
-    try:
-        review = agent3.review_files_and_plan(issue, repo_url)
-        result_queue.put(("agent3", review, None))
-    except Exception as e:
-        result_queue.put(("agent3", None, e))
-
-
-def run_agents_parallel(issue, repo_url):
-    """Run Agent 2 and Agent 3 in parallel using threads."""
-    agent2 = FeasibilityAnalyzerAgent()
-    agent3 = FileReviewerAgent()
-    
-    # Queue to collect results from threads
-    result_queue = Queue()
-    
-    # Start both agents in parallel
-    print("Starting Agent 2 (feasibility analysis) and Agent 3 (file review) in parallel...")
-    
-    thread2 = threading.Thread(target=run_agent_2, args=(agent2, issue, repo_url, result_queue))
-    thread3 = threading.Thread(target=run_agent_3, args=(agent3, issue, repo_url, result_queue))
-    
-    thread2.start()
-    time.sleep(1)  # Small delay to avoid API overload
-    thread3.start()
-    
-    # Wait for Agent 2 to complete first (feasibility analysis)
-    print("Waiting for feasibility analysis...")
-    analysis = None
-    review = None
-    agent2_error = None
-    agent3_error = None
-    
-    while True:
-        try:
-            agent_type, result, error = result_queue.get(timeout=1)
-            if agent_type == "agent2":
-                if error:
-                    agent2_error = error
-                    print(f"Agent 2 failed: {error}")
-                    print("Sending cancellation message to Agent 3...")
-                    agent3.cancel()  # This sends a message to the Devin session
-                    return {"status": "failed", "reason": f"Agent 2 failed: {error}"}
-                else:
-                    analysis = result
-                    print(f"Agent 2 completed!")
-                    break
-        except:
-            # Check if Agent 2 thread is still running
-            if not thread2.is_alive():
-                break
-    
-    print(f"Feasibility: {analysis.get('feasibility_score', 0)}/100")
-    print(f"Complexity: {analysis.get('complexity_score', 0)}/100")
-    print(f"Confidence: {analysis.get('confidence', 0)}/100")
-    
-    # Ask user whether to let Agent 3 continue
-    proceed = input("\nAgent 3 is still working on file review. Let it continue? (y/n): ").strip().lower()
-    if proceed != 'y':
-        print("Sending cancellation message to Agent 3...")
-        agent3.cancel()  # This sends a message to the Devin session
-        return {"status": "cancelled", "reason": "User cancelled after feasibility analysis"}
-    
-    # Wait for Agent 3 to complete
-    print("Waiting for file review to complete...")
-    while True:
-        try:
-            agent_type, result, error = result_queue.get(timeout=1)
-            if agent_type == "agent3":
-                if error:
-                    agent3_error = error
-                    print(f"Agent 3 failed: {error}")
-                    return {"status": "failed", "reason": f"Agent 3 failed: {error}"}
-                else:
-                    review = result
-                    print(f"Agent 3 completed!")
-                    break
-        except:
-            # Check if Agent 3 thread is still running
-            if not thread3.is_alive():
-                break
-    
-    # Show plan
-    print("\nPlan:")
-    for step in review.get("action_plan", []):
-        print(f"• {step.get('description', 'No description')}")
-    
-    # Ask for execution approval
-    proceed = input("\nExecute changes? (y/n): ").strip().lower()
-    if proceed != 'y':
-        return {"status": "cancelled", "reason": "User cancelled execution"}
-    
-    # Execute changes
-    print("Executing...")
-    result = agent3.execute_changes(review, repo_url, user_approval=True)
-    
-    return {
-        "status": "completed",
-        "analysis": analysis,
-        "review": review,
-        "execution": result
-    }
+from utils.utils import get_issue_file_path
 
 
 def main():
@@ -153,22 +34,99 @@ def main():
         return
     
     # Get issue from cache
-    agent1 = IssueFetcherAgent()
-    issue = agent1.get_single_issue(repo_url, issue_id)
+    issue_file_path = get_issue_file_path("cache", repo_url, issue_id)
     
-    if not issue:
+    if not os.path.exists(issue_file_path):
         print(f"Issue #{issue_id} not found. Run run_agent_1.py first.")
         return
     
+    with open(issue_file_path, 'r') as f:
+        issue = json.load(f)
+    
     print(f"Working on issue #{issue_id}: {issue.get('title')}")
     
-    # Run both agents in parallel
-    result = run_agents_parallel(issue, repo_url)
+    # Initialize agents
+    agent2 = FeasibilityAnalyzerAgent()
+    agent3 = FileReviewerAgent()
     
-    if result.get("status") == "completed":
-        print("Done!")
-    else:
-        print(f"Stopped: {result.get('reason')}")
+    # Step 1: Analyze feasibility
+    print("\n=== Step 1: Analyzing feasibility ===")
+    try:
+        analysis = agent2.analyze_issue_feasibility(issue, repo_url)
+        print(f"✅ Feasibility: {analysis.get('feasibility_score', 0)}/100")
+        print(f"✅ Complexity: {analysis.get('complexity_score', 0)}/100")
+        print(f"✅ Confidence: {analysis.get('confidence', 0)}/100")
+    except Exception as e:
+        print(f"❌ Feasibility analysis failed: {e}")
+        return
+    
+    # Ask user whether to continue
+    proceed = input("\nContinue with file review? (y/n): ").strip().lower()
+    if proceed != 'y':
+        print("Stopping workflow.")
+        return
+    
+    # Step 2: Review files and create plan
+    print("\n=== Step 2: Reviewing files and creating plan ===")
+    try:
+        review = agent3.review_files_and_plan(issue, repo_url)
+        print("✅ File review completed!")
+        
+        # Show plan
+        print("\nPlan:")
+        for step in review.get("action_plan", []):
+            print(f"• {step.get('description', 'No description')}")
+    except Exception as e:
+        print(f"❌ File review failed: {e}")
+        return
+    
+    # Ask for execution approval
+    proceed = input("\nExecute changes? (y/n): ").strip().lower()
+    if proceed != 'y':
+        print("Stopping workflow.")
+        return
+    
+    # Step 3: Execute changes
+    print("\n=== Step 3: Executing changes ===")
+    try:
+        execution_result = agent3.execute_changes(review, repo_url, user_approval=True)
+        
+        if execution_result.get("status") == "changes_made":
+            print("✅ Changes executed successfully!")
+            print(f"Branch: {execution_result.get('new_branch', 'unknown')}")
+            print(f"Commit: {execution_result.get('commit_message', 'unknown')}")
+            
+            # Show changes
+            print("\nChanges made:")
+            for change in execution_result.get("changes_made", []):
+                print(f"• {change.get('file', 'unknown')}: {change.get('changes', 'unknown')}")
+        else:
+            print(f"❌ Execution failed: {execution_result.get('reason', 'unknown')}")
+            return
+    except Exception as e:
+        print(f"❌ Execution failed: {e}")
+        return
+    
+    # Ask for push approval
+    push_proceed = input("\nPush changes to GitHub? (y/n): ").strip().lower()
+    if push_proceed != 'y':
+        print("✅ Changes remain local. Not pushing to GitHub.")
+        return
+    
+    # Step 4: Push to GitHub
+    print("\n=== Step 4: Pushing to GitHub ===")
+    try:
+        push_result = agent3.push_to_github(execution_result, repo_url, user_approval=True)
+        
+        if push_result.get("status") == "completed":
+            print("✅ Successfully pushed to GitHub!")
+            print(f"URL: {push_result.get('push_url', 'unknown')}")
+        else:
+            print(f"❌ Push failed: {push_result.get('reason', 'unknown')}")
+    except Exception as e:
+        print(f"❌ Push failed: {e}")
+    
+    print("\n🎉 Workflow completed!")
 
 
 if __name__ == "__main__":

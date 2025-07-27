@@ -13,6 +13,12 @@ def get_cache_key(repo_url: str) -> str:
     return repo_url.replace("https://github.com/", "").replace("/", "_")
 
 
+def get_issue_file_path(cache_dir: str, repo_url: str, issue_number: int) -> str:
+    """Get the file path for a specific issue."""
+    repo_key = get_cache_key(repo_url)
+    return os.path.join(cache_dir, "issues", repo_key, f"issue_{issue_number}.json")
+
+
 def download_attachment(uuid: str, name: str) -> Optional[str]:
     """Download an attachment from Devin."""
     download_url = f"{DEVIN_API_BASE}/attachments/{uuid}/{name}"
@@ -25,6 +31,28 @@ def download_attachment(uuid: str, name: str) -> Optional[str]:
         return content.decode('utf-8')
     except requests.exceptions.RequestException:
         return None
+
+
+def download_json_attachments(message_attachments: List[Dict], name_filter: str = None) -> List[Dict]:
+    """Download JSON files from message attachments and return parsed data."""
+    results = []
+    
+    for attachment in message_attachments:
+        name = attachment.get("name", "")
+        if name_filter and not name.startswith(name_filter):
+            continue
+        if not name.lower().endswith('.json'):
+            continue
+            
+        content = download_attachment(attachment["uuid"], name)
+        if content:
+            try:
+                data = json.loads(content)
+                results.append({"name": name, "data": data})
+            except json.JSONDecodeError:
+                continue
+    
+    return results
 
 
 def extract_attachment_urls_from_messages(messages: List[Dict]) -> List[Dict]:
@@ -46,6 +74,38 @@ def extract_attachment_urls_from_messages(messages: List[Dict]) -> List[Dict]:
                             "name": filename,
                             "url": url
                         })
+    
+    return attachments
+
+
+def extract_attachments_from_session_data(session_data: Dict) -> List[Dict]:
+    """Extract all attachments from session data (messages + structured_output)."""
+    attachments = []
+    seen_uuids = set()
+    
+    # Extract from messages
+    messages = session_data.get("messages", [])
+    message_attachments = extract_attachment_urls_from_messages(messages)
+    for attachment in message_attachments:
+        if attachment["uuid"] not in seen_uuids:
+            attachments.append(attachment)
+            seen_uuids.add(attachment["uuid"])
+    
+    # Extract from structured_output
+    structured_output = session_data.get("structured_output", {})
+    if structured_output and "attachments" in structured_output:
+        for url in structured_output["attachments"]:
+            match = re.search(r'/attachments/([^/]+)/([^/]+)$', url)
+            if match:
+                uuid = match.group(1)
+                filename = match.group(2)
+                if uuid not in seen_uuids:
+                    attachments.append({
+                        "uuid": uuid,
+                        "name": filename,
+                        "url": url
+                    })
+                    seen_uuids.add(uuid)
     
     return attachments
 

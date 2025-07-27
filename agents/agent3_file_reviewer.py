@@ -5,7 +5,7 @@ import os
 import requests
 from typing import Dict, List, Optional
 from core.session_manager import create_devin_session, wait_for_session_completion, send_session_message
-from utils.utils import extract_json_from_attachments, extract_json_from_message_content, get_cache_key
+from utils.utils import get_cache_key, download_json_attachments
 from utils.config import FULL_ANALYSIS_TIMEOUT, DEVIN_API_BASE, DEVIN_API_KEY
 import time
 
@@ -60,40 +60,37 @@ class FileReviewerAgent:
         issue_number = issue.get("number", "unknown")
         print(f"Agent 3: Reviewing files for issue #{issue_number}")
         
-        # Check cache first
+        # Check cache first for the plan
         cache_file = os.path.join(self.cache_dir, f"file_review_{get_cache_key(repo_url)}_{issue_number}.json")
         if os.path.exists(cache_file):
             print(f"Found cached file review for issue #{issue_number}")
             with open(cache_file, 'r') as f:
                 return json.load(f)
         
+        # Upload issue file and get URL
+        file_url = self._upload_issue_file(repo_url, issue_number)
+        
         # Review files with Devin
         prompt = f"""
-        Review the repository {repo_url} and analyze this issue:
+        Review the repository {repo_url} and analyze this issue.
         
-        Issue #{issue_number}:
-        Title: {issue.get('title', 'No title')}
-        Body: {issue.get('body', 'No description')}
-        
+        Issue file: {file_url}
         User Input: {user_input if user_input else "No additional input provided"}
         
-        IMPORTANT: 
-        1. Complete the task fully - do not wait for further instructions
-        2. Mark the task as complete when done
-        3. Save results as JSON attachment if possible
-        4. If you receive a message saying "STOP", immediately stop what you are doing and mark the task as cancelled
+        Analyze the repository structure and create a detailed implementation plan.
         
-        Tasks:
-        1. **File Review**: Identify and read all relevant files
-        2. **Action Plan**: Create detailed step-by-step implementation plan
-        3. **File Changes**: Specify exact changes needed for each file
+        You must:
+        1. Review relevant files (HTML, CSS, JS)
+        2. Create a step-by-step implementation plan
+        3. Save the plan as JSON attachment named "review.json"
+        4. STOP - do not execute anything
         
-        Return as JSON:
+        Return as JSON with this exact structure:
         {{
             "relevant_files": [
                 {{
                     "path": "file path",
-                    "content": "file content or summary",
+                    "content": "file content or summary", 
                     "changes_needed": "what needs to be changed"
                 }}
             ],
@@ -110,15 +107,20 @@ class FileReviewerAgent:
             "testing_plan": "how to test changes"
         }}
         
-        Complete the task and mark as done.
+        Create the plan, save as "review.json" attachment, then STOP. Do not execute.
         """
         
         self._current_session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT)
-        self._current_session_id = None
+        result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
         
-        # Extract review data
-        review_data = self._extract_review_data(result)
+        # Extract review data using utils
+        message_attachments = result.get("message_attachments", [])
+        downloaded_files = download_json_attachments(message_attachments, "review")
+        
+        if not downloaded_files:
+            raise ValueError("No review JSON file found in Devin session result")
+        
+        review_data = downloaded_files[0]["data"]
         
         # Add metadata
         review_data.update({
@@ -129,12 +131,25 @@ class FileReviewerAgent:
             "review_method": "file_review"
         })
         
-        # Cache the results
+        # Cache the extracted results
         with open(cache_file, 'w') as f:
             json.dump(review_data, f, indent=2)
         print(f"Cached file review for issue #{issue_number}")
         
         return review_data
+    
+    def _upload_issue_file(self, repo_url: str, issue_number: str) -> str:
+        """Upload issue file and return URL."""
+        from utils.utils import get_issue_file_path
+        issue_file_path = get_issue_file_path(self.cache_dir, repo_url, issue_number)
+        
+        if not os.path.exists(issue_file_path):
+            raise FileNotFoundError(f"Issue file not found: {issue_file_path}")
+        
+        from core.session_manager import upload_file
+        file_url = upload_file(issue_file_path)
+        print(f"Uploaded issue file: {file_url}")
+        return file_url
     
     def execute_changes(self, review_data: Dict, repo_url: str, user_approval: bool = False) -> Dict:
         """Phase 2: Execute the planned changes (if user approved)."""
@@ -149,120 +164,126 @@ class FileReviewerAgent:
         issue_number = review_data.get("issue_number", "unknown")
         print(f"Agent 3: Executing changes for issue #{issue_number}")
         
-        # Create execution prompt
-        action_plan = review_data.get("action_plan", [])
-        relevant_files = review_data.get("relevant_files", [])
-        
-        prompt = f"""
-        Execute the following changes for issue #{issue_number} in repository {repo_url}:
-        
-        Action Plan:
-        {json.dumps(action_plan, indent=2)}
-        
-        Relevant Files:
-        {json.dumps(relevant_files, indent=2)}
-        
-        IMPORTANT: 
-        1. Complete the task fully - do not wait for further instructions
-        2. Mark the task as complete when done
-        3. Save results as JSON attachment if possible
-        4. Make the actual file changes in the repository
-        5. Create a new branch for these changes
-        6. If you receive a message saying "STOP", immediately stop what you are doing and mark the task as cancelled
-        
-        Execute the changes and return as JSON:
-        {{
-            "status": "completed",
-            "changes_made": [
-                {{
-                    "file": "file path",
-                    "changes": "description of changes",
-                    "branch": "branch name created"
-                }}
-            ],
-            "new_branch": "branch name",
-            "commit_message": "commit message",
-            "summary": "summary of what was accomplished"
-        }}
-        
-        Complete the task and mark as done.
-        """
-        
-        self._current_session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT)
-        self._current_session_id = None
-        
-        # Extract execution results
-        execution_data = self._extract_execution_data(result)
-        
-        # Add metadata
-        execution_data.update({
-            "issue_number": issue_number,
-            "repo_url": repo_url,
-            "execution_method": "file_changes"
-        })
-        
-        # Cache execution results
-        cache_file = os.path.join(self.cache_dir, f"execution_{get_cache_key(repo_url)}_{issue_number}.json")
-        with open(cache_file, 'w') as f:
-            json.dump(execution_data, f, indent=2)
-        
-        return execution_data
+        # Send execution message to the existing session
+        if self._current_session_id:
+            execution_message = f"""
+            EXECUTE: The user approved the plan. Make the changes now.
+            
+            Save the execution results as JSON attachment named "execution.json" with:
+            - status: "changes_made"
+            - changes_made: list of files changed
+            - new_branch: branch name created
+            - commit_message: commit message
+            - summary: summary of what was accomplished
+            
+            STOP before pushing to GitHub.
+            """
+            
+            success = send_session_message(self._current_session_id, execution_message)
+            if success:
+                print("Sent execution command to Devin session")
+                # Wait for completion
+                result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
+                
+                # Extract execution results using utils
+                message_attachments = result.get("message_attachments", [])
+                downloaded_files = download_json_attachments(message_attachments, "execution")
+                
+                if not downloaded_files:
+                    raise ValueError("No execution JSON file found in Devin session result")
+                
+                execution_data = downloaded_files[0]["data"]
+                
+                # Add metadata
+                execution_data.update({
+                    "issue_number": issue_number,
+                    "repo_url": repo_url,
+                    "execution_method": "file_changes"
+                })
+                
+                return execution_data
+            else:
+                print("Failed to send execution command")
+                return {
+                    "status": "failed",
+                    "reason": "Could not send execution command",
+                    "changes_made": [],
+                    "new_branch": "unknown",
+                    "commit_message": "Failed to execute",
+                    "summary": "Execution failed"
+                }
+        else:
+            print("No active session found for execution")
+            return {
+                "status": "failed",
+                "reason": "No active session",
+                "changes_made": [],
+                "new_branch": "unknown",
+                "commit_message": "No session",
+                "summary": "No active session found"
+            }
     
-    def _extract_review_data(self, result: Dict) -> Dict:
-        """Extract review data from Devin session result."""
-        # First try to extract from attachments
-        attachments = result.get("attachments", [])
+    def push_to_github(self, execution_data: Dict, repo_url: str, user_approval: bool = False) -> Dict:
+        """Phase 3: Push changes to GitHub (if user approved)."""
+        if not user_approval:
+            print("User did not approve push to GitHub. Changes remain local.")
+            return {
+                "status": "cancelled",
+                "reason": "User did not approve push to GitHub",
+                "changes": execution_data.get("changes_made", [])
+            }
         
-        if attachments:
-            json_data = extract_json_from_attachments(attachments)
-            if json_data and isinstance(json_data, dict):
-                return json_data
+        issue_number = execution_data.get("issue_number", "unknown")
+        print(f"Agent 3: Pushing changes to GitHub for issue #{issue_number}")
         
-        # Fallback: try to extract from messages
-        messages = result.get("messages", [])
-        if len(messages) > 1:
-            for message in reversed(messages):
-                if message.get("type") == "devin_message":
-                    content = message.get("message", "")
-                    json_data = extract_json_from_message_content(content)
-                    if json_data:
-                        return json_data
-        
-        # Return default review data if nothing found
-        return {
-            "relevant_files": [],
-            "action_plan": [],
-            "estimated_effort": "Unknown",
-            "risks": ["Unable to analyze files"],
-            "testing_plan": "Manual testing required"
-        }
-    
-    def _extract_execution_data(self, result: Dict) -> Dict:
-        """Extract execution data from Devin session result."""
-        # First try to extract from attachments
-        attachments = result.get("attachments", [])
-        
-        if attachments:
-            json_data = extract_json_from_attachments(attachments)
-            if json_data and isinstance(json_data, dict):
-                return json_data
-        
-        # Fallback: try to extract from messages
-        messages = result.get("messages", [])
-        if len(messages) > 1:
-            for message in reversed(messages):
-                if message.get("type") == "devin_message":
-                    content = message.get("message", "")
-                    json_data = extract_json_from_message_content(content)
-                    if json_data:
-                        return json_data
-        
-        # Return default execution data if nothing found
-        return {
-            "status": "unknown",
-            "changes_made": [],
-            "new_branch": "unknown",
-            "commit_message": "Changes for issue",
-            "summary": "Unable to determine execution status"
-        } 
+        # Send push message to the existing session
+        if self._current_session_id:
+            push_message = f"""
+            PUSH: The user approved pushing to GitHub. Push the changes now.
+            
+            Save the push results as JSON attachment named "push.json" with:
+            - status: "completed"
+            - push_url: URL of the pushed branch/PR
+            - summary: summary of what was pushed
+            """
+            
+            success = send_session_message(self._current_session_id, push_message)
+            if success:
+                print("Sent push command to Devin session")
+                # Wait for completion
+                result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
+                self._current_session_id = None
+                
+                # Extract push results using utils
+                message_attachments = result.get("message_attachments", [])
+                downloaded_files = download_json_attachments(message_attachments, "push")
+                
+                if not downloaded_files:
+                    raise ValueError("No push JSON file found in Devin session result")
+                
+                push_data = downloaded_files[0]["data"]
+                
+                # Add metadata
+                push_data.update({
+                    "issue_number": issue_number,
+                    "repo_url": repo_url,
+                    "push_method": "github_push"
+                })
+                
+                return push_data
+            else:
+                print("Failed to send push command")
+                return {
+                    "status": "failed",
+                    "reason": "Could not send push command",
+                    "push_url": "unknown",
+                    "summary": "Push failed"
+                }
+        else:
+            print("No active session found for push")
+            return {
+                "status": "failed",
+                "reason": "No active session",
+                "push_url": "unknown",
+                "summary": "No active session found"
+            } 
