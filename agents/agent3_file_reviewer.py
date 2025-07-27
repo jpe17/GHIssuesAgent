@@ -2,10 +2,12 @@
 
 import json
 import os
+import requests
 from typing import Dict, List, Optional
-from core.session_manager import create_devin_session, wait_for_session_completion
+from core.session_manager import create_devin_session, wait_for_session_completion, send_session_message
 from utils.utils import extract_json_from_attachments, extract_json_from_message_content, get_cache_key
-from utils.config import FULL_ANALYSIS_TIMEOUT
+from utils.config import FULL_ANALYSIS_TIMEOUT, DEVIN_API_BASE, DEVIN_API_KEY
+import time
 
 
 class FileReviewerAgent:
@@ -14,6 +16,44 @@ class FileReviewerAgent:
     def __init__(self, cache_dir: str = "cache"):
         self.cache_dir = cache_dir
         os.makedirs(cache_dir, exist_ok=True)
+        self._current_session_id = None
+    
+    def cancel(self):
+        """Cancel the current operation by sending a cancellation message to Devin."""
+        if self._current_session_id:
+            print(f"Sending cancellation message to Devin session {self._current_session_id}...")
+            
+            # Keep trying to send the cancellation message every 10 seconds
+            max_attempts = 30  # 5 minutes max
+            for attempt in range(max_attempts):
+                try:
+                    # First check if the session is still active
+                    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
+                    response = requests.get(f"{DEVIN_API_BASE}/session/{self._current_session_id}", headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        status = data.get("status_enum")
+                        if status in ["completed", "failed", "stopped", "blocked"]:
+                            print(f"Session {self._current_session_id} is already {status}, no need to cancel")
+                            return
+                    
+                    # Try to send cancellation message
+                    success = send_session_message(
+                        self._current_session_id, 
+                        "STOP: The user has cancelled this operation. Please stop what you are doing and mark the task as cancelled."
+                    )
+                    if success:
+                        print(f"Cancellation message sent successfully on attempt {attempt + 1}")
+                        return
+                    else:
+                        print(f"Attempt {attempt + 1}: Session not ready yet, retrying in 10 seconds...")
+                        time.sleep(10)
+                        
+                except Exception as e:
+                    print(f"Attempt {attempt + 1}: Error, retrying in 10 seconds...")
+                    time.sleep(10)
+            
+            print("Could not send cancellation message after 5 minutes - session may have completed")
     
     def review_files_and_plan(self, issue: Dict, repo_url: str, user_input: str = "") -> Dict:
         """Phase 1: Review relevant files and create action plan."""
@@ -41,6 +81,7 @@ class FileReviewerAgent:
         1. Complete the task fully - do not wait for further instructions
         2. Mark the task as complete when done
         3. Save results as JSON attachment if possible
+        4. If you receive a message saying "STOP", immediately stop what you are doing and mark the task as cancelled
         
         Tasks:
         1. **File Review**: Identify and read all relevant files
@@ -72,8 +113,9 @@ class FileReviewerAgent:
         Complete the task and mark as done.
         """
         
-        session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(session_id, timeout=FULL_ANALYSIS_TIMEOUT)
+        self._current_session_id = create_devin_session(prompt, repo_url)
+        result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT)
+        self._current_session_id = None
         
         # Extract review data
         review_data = self._extract_review_data(result)
@@ -126,6 +168,7 @@ class FileReviewerAgent:
         3. Save results as JSON attachment if possible
         4. Make the actual file changes in the repository
         5. Create a new branch for these changes
+        6. If you receive a message saying "STOP", immediately stop what you are doing and mark the task as cancelled
         
         Execute the changes and return as JSON:
         {{
@@ -145,8 +188,9 @@ class FileReviewerAgent:
         Complete the task and mark as done.
         """
         
-        session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(session_id, timeout=FULL_ANALYSIS_TIMEOUT)
+        self._current_session_id = create_devin_session(prompt, repo_url)
+        result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT)
+        self._current_session_id = None
         
         # Extract execution results
         execution_data = self._extract_execution_data(result)

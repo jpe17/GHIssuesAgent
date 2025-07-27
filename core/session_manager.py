@@ -23,6 +23,23 @@ def create_devin_session(prompt: str, repo_url: str = None) -> str:
         raise Exception(f"Failed to create session: {e}")
 
 
+def send_session_message(session_id: str, message: str) -> bool:
+    """Send a message to an active Devin session."""
+    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
+    
+    try:
+        response = requests.post(
+            f"{DEVIN_API_BASE}/session/{session_id}/message",
+            headers=headers,
+            json={"message": message}
+        )
+        response.raise_for_status()
+        return True
+    except requests.exceptions.RequestException as e:
+        # Don't print verbose error details
+        return False
+
+
 def wait_for_session_completion(session_id: str, timeout: int = 300) -> dict:
     """Wait for session to complete and return result."""
     start_time = time.time()
