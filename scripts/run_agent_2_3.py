@@ -4,6 +4,9 @@
 import sys
 import os
 import json
+import threading
+import time
+from queue import Queue
 
 # Add the parent directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -11,6 +14,24 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents.agent2_feasibility_analyzer import FeasibilityAnalyzerAgent
 from agents.agent3_file_reviewer import FileReviewerAgent
 from utils.utils import get_issue_file_path
+
+
+def run_agent_2(agent2, issue, repo_url, result_queue):
+    """Run Agent 2 in a separate thread."""
+    try:
+        analysis = agent2.analyze_issue_feasibility(issue, repo_url)
+        result_queue.put(("agent2", analysis, None))
+    except Exception as e:
+        result_queue.put(("agent2", None, e))
+
+
+def run_agent_3(agent3, issue, repo_url, result_queue):
+    """Run Agent 3 in a separate thread."""
+    try:
+        plan = agent3.plan(issue, repo_url)
+        result_queue.put(("agent3", plan, None))
+    except Exception as e:
+        result_queue.put(("agent3", None, e))
 
 
 def main():
@@ -49,84 +70,131 @@ def main():
     agent2 = FeasibilityAnalyzerAgent()
     agent3 = FileReviewerAgent()
     
-    # Step 1: Analyze feasibility
-    print("\n=== Step 1: Analyzing feasibility ===")
-    try:
-        analysis = agent2.analyze_issue_feasibility(issue, repo_url)
-        print(f"✅ Feasibility: {analysis.get('feasibility_score', 0)}/100")
-        print(f"✅ Complexity: {analysis.get('complexity_score', 0)}/100")
-        print(f"✅ Confidence: {analysis.get('confidence', 0)}/100")
-    except Exception as e:
-        print(f"❌ Feasibility analysis failed: {e}")
+    # Queue to collect results from threads
+    result_queue = Queue()
+    
+    # Start both agents in parallel
+    print("Starting Agent 2 (feasibility) and Agent 3 (file review) in parallel...")
+    
+    thread2 = threading.Thread(target=run_agent_2, args=(agent2, issue, repo_url, result_queue))
+    thread3 = threading.Thread(target=run_agent_3, args=(agent3, issue, repo_url, result_queue))
+    
+    thread2.start()
+    time.sleep(1)  # Small delay to avoid API overload
+    thread3.start()
+    
+    # Wait for both agents to complete, but always show Agent 2 results first
+    print("Waiting for both agents to complete...")
+    analysis = None
+    plan = None
+    agent2_completed = False
+    agent3_completed = False
+    
+    # Wait for Agent 2 to complete first and show results immediately
+    print("Waiting for feasibility analysis...")
+    analysis = None
+    
+    while not agent2_completed:
+        try:
+            agent_type, result, error = result_queue.get(timeout=1)
+            if agent_type == "agent2":
+                if error:
+                    print(f"Agent 2 failed: {error}")
+                    print("Sending cancellation message to Agent 3...")
+                    agent3.cancel()
+                    return
+                else:
+                    analysis = result
+                    agent2_completed = True
+                    print(f"Agent 2 completed!")
+                    break
+            elif agent_type == "agent3":
+                # Store Agent 3 result but don't show yet
+                if error:
+                    print(f"Agent 3 failed: {error}")
+                    return
+                else:
+                    plan = result
+                    agent3_completed = True
+                    print(f"Agent 3 completed!")
+        except:
+            if not thread2.is_alive() and not agent2_completed:
+                print("Agent 2 thread died without completing")
+                return
+    
+    # Show Agent 2 results immediately
+    if analysis:
+        print(f"\n=== FEASIBILITY ANALYSIS ===")
+        print(f"Feasibility: {analysis.get('feasibility_score', 0)}/100")
+        print(f"Complexity: {analysis.get('complexity_score', 0)}/100")
+        print(f"Confidence: {analysis.get('confidence', 0)}/100")
+    else:
+        print("Agent 2 failed to complete")
         return
     
-    # Ask user whether to continue
-    proceed = input("\nContinue with file review? (y/n): ").strip().lower()
+    # Ask user whether to continue with Agent 3
+    proceed = input("\nContinue with Agent 3 (planning)? (y/n): ").strip().lower()
     if proceed != 'y':
-        print("Stopping workflow.")
+        print("Sending cancellation message to Agent 3...")
+        agent3.cancel()
         return
     
-    # Step 2: Review files and create plan
-    print("\n=== Step 2: Reviewing files and creating plan ===")
-    try:
-        review = agent3.review_files_and_plan(issue, repo_url)
-        print("✅ File review completed!")
-        
-        # Show plan
-        print("\nPlan:")
-        for step in review.get("action_plan", []):
-            print(f"• {step.get('description', 'No description')}")
-    except Exception as e:
-        print(f"❌ File review failed: {e}")
-        return
+    # Now wait for Agent 3 if it hasn't completed yet
+    if not agent3_completed:
+        print("Waiting for Agent 3 to complete planning...")
+        while not agent3_completed:
+            try:
+                agent_type, result, error = result_queue.get(timeout=1)
+                if agent_type == "agent3":
+                    if error:
+                        print(f"Agent 3 failed: {error}")
+                        return
+                    else:
+                        plan = result
+                        agent3_completed = True
+                        print(f"Agent 3 completed plan!")
+                        break
+            except:
+                if not thread3.is_alive():
+                    print("Agent 3 thread died without completing")
+                    return
+    else:
+        print("Agent 3 has already completed the plan!")
     
     # Ask for execution approval
-    proceed = input("\nExecute changes? (y/n): ").strip().lower()
+    proceed = input("\nExecute this plan? (y/n): ").strip().lower()
     if proceed != 'y':
-        print("Stopping workflow.")
+        print("Stopping. No changes will be made.")
         return
     
-    # Step 3: Execute changes
-    print("\n=== Step 3: Executing changes ===")
-    try:
-        execution_result = agent3.execute_changes(review, repo_url, user_approval=True)
+    # Execute changes using the same session
+    print("Executing...")
+    execution_result = agent3.execute(plan, repo_url)
+    
+    # Show execution results
+    if execution_result.get("status") == "changes_made":
+        print("Changes executed successfully!")
+        print(f"Branch: {execution_result.get('new_branch', 'unknown')}")
+        print(f"Commit: {execution_result.get('commit_message', 'unknown')}")
         
-        if execution_result.get("status") == "changes_made":
-            print("✅ Changes executed successfully!")
-            print(f"Branch: {execution_result.get('new_branch', 'unknown')}")
-            print(f"Commit: {execution_result.get('commit_message', 'unknown')}")
-            
-            # Show changes
-            print("\nChanges made:")
-            for change in execution_result.get("changes_made", []):
-                print(f"• {change.get('file', 'unknown')}: {change.get('changes', 'unknown')}")
-        else:
-            print(f"❌ Execution failed: {execution_result.get('reason', 'unknown')}")
+        # Show changes
+        print("\nChanges made:")
+        for change in execution_result.get("changes_made", []):
+            print(f"• {change.get('file', 'unknown')}: {change.get('changes', 'unknown')}")
+        
+        # Ask for push approval
+        push_proceed = input("\nPush changes to GitHub? (y/n): ").strip().lower()
+        if push_proceed != 'y':
+            print("Changes remain local. Not pushing to GitHub.")
             return
-    except Exception as e:
-        print(f"❌ Execution failed: {e}")
-        return
-    
-    # Ask for push approval
-    push_proceed = input("\nPush changes to GitHub? (y/n): ").strip().lower()
-    if push_proceed != 'y':
-        print("✅ Changes remain local. Not pushing to GitHub.")
-        return
-    
-    # Step 4: Push to GitHub
-    print("\n=== Step 4: Pushing to GitHub ===")
-    try:
-        push_result = agent3.push_to_github(execution_result, repo_url, user_approval=True)
         
-        if push_result.get("status") == "completed":
-            print("✅ Successfully pushed to GitHub!")
-            print(f"URL: {push_result.get('push_url', 'unknown')}")
-        else:
-            print(f"❌ Push failed: {push_result.get('reason', 'unknown')}")
-    except Exception as e:
-        print(f"❌ Push failed: {e}")
+        # Push to GitHub
+        print("Pushing to GitHub...")
+        push_result = agent3.push(execution_result, repo_url)
+    else:
+        print(f"Execution failed: {execution_result.get('reason', 'unknown')}")
     
-    print("\n🎉 Workflow completed!")
+    print("Workflow completed!")
 
 
 if __name__ == "__main__":

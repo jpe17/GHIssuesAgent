@@ -10,6 +10,10 @@ load_dotenv()
 DEVIN_API_KEY = os.getenv("DEVIN_API_KEY")
 DEVIN_API_BASE = "https://api.devin.ai/v1"
 
+# Validate API key
+if not DEVIN_API_KEY:
+    raise ValueError("DEVIN_API_KEY environment variable is not set. Please set it in your .env file.")
+
 # Timeout configurations
 SCAN_TIMEOUT = 300  # 5 minutes for repository scanning (deprecated)
 TARGETED_ANALYSIS_TIMEOUT = 600  # 10 minutes for targeted analysis (deprecated)

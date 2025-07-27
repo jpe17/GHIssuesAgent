@@ -28,7 +28,8 @@ class FeasibilityAnalyzerAgent:
                 return json.load(f)
         
         # Upload issue file and get URL
-        file_url = self._upload_issue_file(repo_url, issue_number)
+        from utils.utils import upload_issue_file
+        file_url = upload_issue_file(self.cache_dir, repo_url, issue_number)
         
         # Analyze with Devin
         prompt = f"""
@@ -53,11 +54,7 @@ class FeasibilityAnalyzerAgent:
            - estimated_files: List of files that might need changes
            - dependencies: Dependencies that might be affected
            - risks: Potential risks or challenges
-        5. **Effort Estimation**:
-           - hours: Estimated hours for implementation
-           - testing: Testing requirements
-           - documentation: Documentation needs
-        6. **Confidence**: 0-100 based on clarity and feasibility
+        5. **Confidence**: 0-100 based on clarity and feasibility
         
         Return as JSON with keys: feasibility_score, complexity_score, scope_assessment, 
         technical_analysis, effort_estimation, confidence
@@ -77,43 +74,9 @@ class FeasibilityAnalyzerAgent:
         
         analysis_data = downloaded_files[0]["data"]
         
-        # Add issue metadata
-        analysis_data.update({
-            "issue_number": issue_number,
-            "issue_title": issue.get("title", ""),
-            "repo_url": repo_url,
-            "analysis_method": "feasibility_analysis"
-        })
-        
         # Cache the results
         with open(cache_file, 'w') as f:
             json.dump(analysis_data, f, indent=2)
         print(f"Cached feasibility analysis for issue #{issue_number}")
         
-        return analysis_data
-    
-    def _upload_issue_file(self, repo_url: str, issue_number: str) -> str:
-        """Upload issue file and return URL."""
-        from utils.utils import get_issue_file_path
-        issue_file_path = get_issue_file_path(self.cache_dir, repo_url, issue_number)
-        
-        if not os.path.exists(issue_file_path):
-            raise FileNotFoundError(f"Issue file not found: {issue_file_path}")
-        
-        file_url = upload_file(issue_file_path)
-        print(f"Uploaded issue file: {file_url}")
-        return file_url
-    
-    def analyze_multiple_issues(self, issues: List[Dict], repo_url: str) -> List[Dict]:
-        """Analyze multiple issues and return sorted by feasibility."""
-        print(f"Agent 2: Analyzing {len(issues)} issues for feasibility")
-        
-        results = []
-        for issue in issues:
-            analysis = self.analyze_issue_feasibility(issue, repo_url)
-            results.append(analysis)
-        
-        # Sort by feasibility score (highest first)
-        results.sort(key=lambda x: x.get("feasibility_score", 0), reverse=True)
-        
-        return results 
+        return analysis_data 
