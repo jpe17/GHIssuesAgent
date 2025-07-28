@@ -2,8 +2,8 @@
 
 import json
 import os
-from typing import Dict, List
-from core.session_manager import create_devin_session, wait_for_session_completion, upload_file
+from typing import Dict
+from core.session_manager import create_devin_session, wait_for_session_completion
 from utils.utils import get_cache_key, download_json_attachments
 from utils.config import FULL_ANALYSIS_TIMEOUT
 
@@ -27,16 +27,23 @@ class FeasibilityAnalyzerAgent:
             with open(cache_file, 'r') as f:
                 return json.load(f)
         
-        # Upload issue file and get URL
-        from utils.utils import upload_issue_file
-        file_url = upload_issue_file(self.cache_dir, repo_url, issue_number)
+        # Prepare issue data for analysis
+        issue_data = {
+            "number": issue.get("number"),
+            "title": issue.get("title"),
+            "body": issue.get("body"),
+            "labels": [label.get("name") for label in issue.get("labels", [])],
+            "state": issue.get("state"),
+            "created_at": issue.get("created_at"),
+            "updated_at": issue.get("updated_at")
+        }
         
         # Analyze with Devin
         prompt = f"""
         Analyze this GitHub issue for feasibility and complexity.
         
         Repository: {repo_url}
-        Issue file: {file_url}
+        Issue Data: {json.dumps(issue_data, indent=2)}
         
         IMPORTANT: 
         1. Complete the task fully - do not wait for further instructions
@@ -73,6 +80,13 @@ class FeasibilityAnalyzerAgent:
             raise ValueError("No analysis JSON file found in Devin session result")
         
         analysis_data = downloaded_files[0]["data"]
+        
+        # Add issue metadata to the result
+        analysis_data.update({
+            "issue_number": issue.get("number"),
+            "issue_title": issue.get("title"),
+            "issue_url": issue.get("html_url")
+        })
         
         # Cache the results
         with open(cache_file, 'w') as f:

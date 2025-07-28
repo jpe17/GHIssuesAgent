@@ -92,84 +92,6 @@ def display_live_messages(session_id: str, last_message_count: int = 0) -> int:
     return last_message_count
 
 
-def upload_file(file_path: str) -> str:
-    """Upload a file to Devin and return the file URL."""
-    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
-    
-    # Debug info
-    print(f"Uploading file: {file_path}")
-    print(f"File size: {os.path.getsize(file_path)} bytes")
-    print(f"API endpoint: {DEVIN_API_BASE}/attachments")
-    
-    try:
-        with open(file_path, "rb") as f:
-            response = requests.post(
-                f"{DEVIN_API_BASE}/attachments",
-                headers=headers,
-                files={"file": f}
-            )
-            print(f"Response status: {response.status_code}")
-            print(f"Response headers: {dict(response.headers)}")
-            
-            response.raise_for_status()
-            file_url = response.text
-            print(f"Upload successful, URL: {file_url}")
-            return file_url
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP Error Response: {e.response.text}")
-        if e.response.status_code == 401:
-            raise Exception(f"Unauthorized: Check your DEVIN_API_KEY. Status: {e.response.status_code}")
-        elif e.response.status_code == 403:
-            raise Exception(f"Forbidden: API key may not have upload permissions. Status: {e.response.status_code}")
-        else:
-            raise Exception(f"HTTP error uploading file {file_path}: {e.response.status_code} - {e.response.text}")
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"Failed to upload file {file_path}: {e}")
-
-
-def download_file_in_session(session_id: str, file_url: str) -> bool:
-    """Download a file in a Devin session so it can be accessed."""
-    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
-    
-    download_message = f"""
-    Please download and read this file: {file_url}
-    
-    This file contains important information that you need to analyze.
-    """
-    
-    try:
-        response = requests.post(
-            f"{DEVIN_API_BASE}/session/{session_id}/message",
-            headers=headers,
-            json={"message": download_message}
-        )
-        response.raise_for_status()
-        print(f"Download message sent to session {session_id}")
-        return True
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to send download message: {e}")
-        return False
-
-
-def upload_file_to_session(session_id: str, file_path: str) -> bool:
-    """Upload a file directly to a Devin session."""
-    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
-    
-    try:
-        with open(file_path, "rb") as f:
-            response = requests.post(
-                f"{DEVIN_API_BASE}/session/{session_id}/upload",
-                headers=headers,
-                files={"file": f}
-            )
-            response.raise_for_status()
-            print(f"File uploaded to session {session_id}")
-            return True
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to upload file to session: {e}")
-        return False
-
-
 def send_session_message(session_id: str, message: str) -> bool:
     """Send a message to an active Devin session."""
     headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
@@ -223,4 +145,4 @@ def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: 
         except requests.exceptions.RequestException as e:
             print(f"Error checking session status: {e}")
         
-        time.sleep(5) 
+        time.sleep(5)

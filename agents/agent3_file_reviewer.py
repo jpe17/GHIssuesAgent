@@ -4,9 +4,8 @@ import json
 import os
 from typing import Dict
 from core.session_manager import create_devin_session, wait_for_session_completion, send_session_message
-from utils.utils import upload_issue_file, download_json_attachments
+from utils.utils import download_json_attachments
 from utils.config import FULL_ANALYSIS_TIMEOUT
-from utils.utils import get_issue_file_path
 
 
 class FileReviewerAgent:
@@ -17,32 +16,41 @@ class FileReviewerAgent:
         os.makedirs(cache_dir, exist_ok=True)
         self._current_session_id = None
     
-    def cancel(self):
-        """Cancel the current operation by sending a cancellation message to Devin."""
-        if self._current_session_id:
-            from utils.utils import send_cancel_message
-            send_cancel_message(self._current_session_id)
-    
-    def plan(self, issue: Dict, repo_url: str) -> Dict:
-        """Step 1: Create a plan and STOP."""
-        issue_number = issue.get("number", "unknown")
-        print(f"Step 1: Creating plan for issue #{issue_number}")
+    def review_files_and_plan(self, issue_data: Dict, repo_url: str) -> Dict:
+        """Review files and create an implementation plan."""
+        issue_number = issue_data.get("issue_number", "unknown")
+        print(f"Agent 3: Creating plan for issue #{issue_number}")
         
-        # Upload issue file and get URL
-        file_url = upload_issue_file(self.cache_dir, repo_url, issue_number)
+        # Prepare issue data for analysis
+        issue_info = {
+            "number": issue_number,
+            "title": issue_data.get("issue_title"),
+            "url": issue_data.get("issue_url"),
+            "feasibility_score": issue_data.get("feasibility_score"),
+            "complexity_score": issue_data.get("complexity_score"),
+            "scope_assessment": issue_data.get("scope_assessment"),
+            "technical_analysis": issue_data.get("technical_analysis")
+        }
         
-        # Create session with file URL in prompt
+        # Create session with issue data in prompt
         prompt = f"""
         Create an implementation plan for this issue.
         
         Repository: {repo_url}
-        Issue file: {file_url}
+        Issue Info: {json.dumps(issue_info, indent=2)}
+        
+        Analyze the repository and create a detailed implementation plan.
         
         Save plan as "plan.json" with this format:
         {{
-            "summary": "Brief overview",
-            "files_to_modify": [{{"file": "path", "changes": "description"}}],
-            "implementation_steps": [{{"step": 1, "description": "what to do"}}]
+            "summary": "Brief overview of the implementation",
+            "action_plan": [
+                {{"step": 1, "description": "what to do", "files": ["file1.py", "file2.py"]}},
+                {{"step": 2, "description": "what to do next", "files": ["file3.py"]}}
+            ],
+            "estimated_effort": "Small/Medium/Large",
+            "risks": ["risk1", "risk2"],
+            "dependencies": ["dep1", "dep2"]
         }}
         
         DO NOT implement anything. Only create the plan document.
@@ -51,40 +59,47 @@ class FileReviewerAgent:
         self._current_session_id = create_devin_session(prompt, repo_url)
         result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
         
-        # Extract plan data from message content
-        from utils.utils import extract_json_from_message_content
-        messages = result.get("messages", [])
-        plan_data = None
+        # Extract plan data from attachments
+        message_attachments = result.get("message_attachments", [])
+        downloaded_files = download_json_attachments(message_attachments, "plan")
         
-        for msg in messages:
-            if msg.get("type") == "devin_message":
-                content = msg.get("message", "")
-                plan_data = extract_json_from_message_content(content)
-                if plan_data:
-                    print("Found plan in message content")
-                    break
-        
-        if not plan_data:
-            raise ValueError("No plan JSON found in Devin session result")
+        if not downloaded_files:
+            # Try to extract from message content as fallback
+            from utils.utils import extract_json_from_message_content
+            messages = result.get("messages", [])
+            plan_data = None
+            
+            for msg in messages:
+                if msg.get("type") == "devin_message":
+                    content = msg.get("message", "")
+                    plan_data = extract_json_from_message_content(content)
+                    if plan_data:
+                        print("Found plan in message content")
+                        break
+            
+            if not plan_data:
+                raise ValueError("No plan JSON found in Devin session result")
+        else:
+            plan_data = downloaded_files[0]["data"]
         
         # Display plan
-        print("\n=== PLAN ===")
+        print("\n=== IMPLEMENTATION PLAN ===")
         if "action_plan" in plan_data:
             for i, step in enumerate(plan_data["action_plan"], 1):
                 print(f"{i}. {step.get('description', 'No description')}")
+                if step.get('files'):
+                    print(f"   Files: {', '.join(step['files'])}")
         else:
             print(json.dumps(plan_data, indent=2))
         
         return plan_data
     
-
-    
-    def execute(self, plan_data: Dict, repo_url: str) -> Dict:
-        """Step 2: Execute the plan and STOP."""
-        print("\nStep 2: Executing plan...")
+    def execute_changes(self, plan_data: Dict, repo_url: str, user_approval: bool = True) -> Dict:
+        """Execute the implementation plan."""
+        print("\nAgent 3: Executing implementation plan...")
         
         if not self._current_session_id:
-            raise ValueError("No active session. Run plan() first.")
+            raise ValueError("No active session. Run review_files_and_plan() first.")
         
         execution_message = f"""
         EXECUTE: The user approved the plan. Make the changes now.
@@ -134,57 +149,4 @@ class FileReviewerAgent:
             for change in execution_data["changes_made"]:
                 print(f"• {change.get('file', 'unknown')}: {change.get('changes', 'unknown')}")
         
-        return execution_data
-    
-    def push(self, execution_data: Dict, repo_url: str) -> Dict:
-        """Step 3: Push to GitHub."""
-        print("\nStep 3: Pushing to GitHub...")
-        
-        if not self._current_session_id:
-            raise ValueError("No active session. Run plan() and execute() first.")
-        
-        push_message = f"""
-        PUSH: The user approved the changes. Push to GitHub now.
-        
-        Execution data: {json.dumps(execution_data)}
-        
-        You must:
-        1. Push the branch to GitHub
-        2. Create a pull request if appropriate
-        3. Save push results as JSON attachment named "push.json"
-        4. STOP
-        
-        The push results should include:
-        - status: "completed" or "failed"
-        - push_url: URL of the pushed branch/PR
-        - branch_name: name of the pushed branch
-        - summary: summary of what was pushed
-        
-        Save as "push.json" attachment, then STOP.
-        """
-        
-        success = send_session_message(self._current_session_id, push_message)
-        if not success:
-            raise ValueError("Failed to send push command")
-        
-        result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
-        
-        # Extract push results
-        message_attachments = result.get("message_attachments", [])
-        downloaded_files = download_json_attachments(message_attachments, "push")
-        
-        if not downloaded_files:
-            raise ValueError("No push JSON file found in session result")
-        
-        push_data = downloaded_files[0]["data"]
-        
-        # Display results
-        print("\n=== PUSH RESULTS ===")
-        print(f"Status: {push_data.get('status', 'unknown')}")
-        if push_data.get('status') == 'completed':
-            print(f"URL: {push_data.get('push_url', 'unknown')}")
-            print("Successfully pushed to GitHub!")
-        else:
-            print(f"Push failed: {push_data.get('reason', 'unknown')}")
-        
-        return push_data 
+        return execution_data 

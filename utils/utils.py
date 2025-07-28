@@ -13,26 +13,6 @@ def get_cache_key(repo_url: str) -> str:
     return repo_url.replace("https://github.com/", "").replace("/", "_")
 
 
-def get_issue_file_path(cache_dir: str, repo_url: str, issue_number: int) -> str:
-    """Get the file path for a specific issue."""
-    repo_key = get_cache_key(repo_url)
-    return os.path.join(cache_dir, "issues", repo_key, f"issue_{issue_number}.json")
-
-
-def upload_issue_file(cache_dir: str, repo_url: str, issue_number: str) -> str:
-    """Upload issue file and return URL."""
-    from core.session_manager import upload_file
-    
-    issue_file_path = get_issue_file_path(cache_dir, repo_url, issue_number)
-    
-    if not os.path.exists(issue_file_path):
-        raise FileNotFoundError(f"Issue file not found: {issue_file_path}")
-    
-    file_url = upload_file(issue_file_path)
-    print(f"Uploaded issue file: {file_url}")
-    return file_url
-
-
 def download_attachment(uuid: str, name: str) -> Optional[str]:
     """Download an attachment from Devin."""
     download_url = f"{DEVIN_API_BASE}/attachments/{uuid}/{name}"
@@ -154,8 +134,8 @@ def extract_json_from_message_content(content: str) -> Optional[Dict]:
     return None
 
 
-def send_cancel_message(session_id: str, max_attempts: int = 30) -> bool:
-    """Send a cancellation message to an active Devin session.
+def cancel_session(session_id: str, max_attempts: int = 30) -> bool:
+    """Cancel a Devin session by sending a cancellation message.
     
     Args:
         session_id: The session ID to cancel

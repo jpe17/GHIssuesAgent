@@ -9,7 +9,7 @@ class WorkflowCoordinator:
     """Simple workflow coordinator."""
     
     def run_full_workflow(self, repo_url: str, user_input: str = "") -> dict:
-        """Run the simple workflow: Agent 1 -> Agent 2 -> User picks -> Agent 3."""
+        """Run the simple workflow: Agent 1 -> Agent 2 -> Agent 3."""
         
         # Step 1: Get issues
         print("Fetching issues...")
@@ -18,29 +18,33 @@ class WorkflowCoordinator:
         if not issues:
             return {"error": "No issues found"}
         
-        # Step 2: Analyze all issues
-        print("Analyzing feasibility...")
-        agent2 = FeasibilityAnalyzerAgent()
-        results = agent2.analyze_multiple_issues(issues, repo_url)
+        # Show available issues
+        print("\nAvailable issues:")
+        for i, issue in enumerate(issues[:10]):  # Show first 10
+            print(f"{i+1}. #{issue.get('number')}: {issue.get('title')}")
         
-        # Show top 5 issues
-        print("\nTop issues:")
-        for i, result in enumerate(results[:5]):
-            print(f"{i+1}. #{result.get('issue_number')}: {result.get('issue_title')}")
-            print(f"   Score: {result.get('feasibility_score', 0)}/100")
-        
-        # Step 3: User picks issue
-        choice = input("\nPick issue (1-5): ").strip()
-        if not choice.isdigit() or int(choice) < 1 or int(choice) > 5:
+        # Step 2: User picks issue
+        choice = input("\nPick issue (1-10): ").strip()
+        if not choice.isdigit() or int(choice) < 1 or int(choice) > min(10, len(issues)):
             return {"error": "Invalid choice"}
         
-        selected = results[int(choice) - 1]
-        print(f"Selected: #{selected.get('issue_number')}")
+        selected_issue = issues[int(choice) - 1]
+        print(f"Selected: #{selected_issue.get('number')}: {selected_issue.get('title')}")
+        
+        # Step 3: Analyze feasibility
+        print("Analyzing feasibility...")
+        agent2 = FeasibilityAnalyzerAgent()
+        analysis = agent2.analyze_issue_feasibility(selected_issue, repo_url)
+        
+        # Show analysis
+        print(f"\nFeasibility Score: {analysis.get('feasibility_score', 0)}/100")
+        print(f"Complexity Score: {analysis.get('complexity_score', 0)}/100")
+        print(f"Confidence: {analysis.get('confidence', 0)}/100")
         
         # Step 4: Review files and plan
         print("Reviewing files...")
         agent3 = FileReviewerAgent()
-        review = agent3.review_files_and_plan(selected, repo_url)
+        review = agent3.review_files_and_plan(analysis, repo_url)
         
         # Show plan
         print("\nPlan:")
@@ -58,6 +62,7 @@ class WorkflowCoordinator:
         
         return {
             "status": "completed",
-            "selected_issue": selected,
+            "selected_issue": selected_issue,
+            "analysis": analysis,
             "execution": result
         } 

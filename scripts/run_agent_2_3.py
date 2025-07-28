@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.agent2_feasibility_analyzer import FeasibilityAnalyzerAgent
 from agents.agent3_file_reviewer import FileReviewerAgent
-from utils.utils import get_issue_file_path
+from utils.utils import cancel_session
 
 
 def run_agent_2(agent2, issue, repo_url, result_queue):
@@ -101,7 +101,8 @@ def main():
                 if error:
                     print(f"Agent 2 failed: {error}")
                     print("Sending cancellation message to Agent 3...")
-                    agent3.cancel()
+                    if agent3._current_session_id:
+                        cancel_session(agent3._current_session_id)
                     return
                 else:
                     analysis = result
@@ -136,7 +137,8 @@ def main():
     proceed = input("\nContinue with Agent 3 (planning)? (y/n): ").strip().lower()
     if proceed != 'y':
         print("Sending cancellation message to Agent 3...")
-        agent3.cancel()
+        if agent3._current_session_id:
+            cancel_session(agent3._current_session_id)
         return
     
     # Now wait for Agent 3 if it hasn't completed yet
