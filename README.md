@@ -80,7 +80,7 @@ A modern, AI-powered GitHub issues analyzer that helps developers understand and
 
 ### Option 1: Full Workflow (All Three Agents)
 ```bash
-python run_workflow.py "https://github.com/owner/repo" "additional context"
+python scripts/run_agents.py "https://github.com/owner/repo"
 ```
 
 ### Option 2: Agents 2 & 3 Only
@@ -122,7 +122,6 @@ GHIssuesAgent/
 │   ├── agent2_feasibility_analyzer.py # Agent 2: Feasibility analysis
 │   ├── agent3_plan.py            # Agent 3: Implementation planning
 │   ├── agent4_executor.py        # Agent 4: Plan execution & GitHub push
-│   ├── workflow_coordinator.py   # Workflow management
 │   ├── config.py                 # Configuration and environment variables
 │   ├── issues_service.py         # Legacy GitHub issues fetching service
 │   ├── issue_analyzer.py         # Legacy AI-powered issue analysis
@@ -135,7 +134,7 @@ GHIssuesAgent/
 ├── cache/                        # Cached repository data
 ├── data/                         # Data files
 ├── main.py                       # Application entry point
-├── run_workflow.py               # Full workflow runner
+├── scripts/run_agents.py         # Full workflow runner
 ├── run_agents_2_3.py            # Agents 2 & 3 runner
 ├── requirements.txt              # Python dependencies
 └── README.md                    # This file
