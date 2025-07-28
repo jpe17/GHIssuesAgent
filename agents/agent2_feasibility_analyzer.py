@@ -27,15 +27,13 @@ class FeasibilityAnalyzerAgent:
             with open(cache_file, 'r') as f:
                 return json.load(f)
         
-        # Prepare issue data for analysis
+        # Prepare issue data for analysis (only include non-null fields)
         issue_data = {
             "number": issue.get("number"),
             "title": issue.get("title"),
             "body": issue.get("body"),
             "labels": [label.get("name") for label in issue.get("labels", [])],
-            "state": issue.get("state"),
-            "created_at": issue.get("created_at"),
-            "updated_at": issue.get("updated_at")
+            "created_at": issue.get("created_at")
         }
         
         # Analyze with Devin
@@ -83,7 +81,6 @@ class FeasibilityAnalyzerAgent:
         analysis_data.update({
             "issue_number": issue.get("number"),
             "issue_title": issue.get("title"),
-            "issue_url": issue.get("html_url")
         })
         
         # Cache the results

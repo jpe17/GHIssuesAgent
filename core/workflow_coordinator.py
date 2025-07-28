@@ -40,16 +40,16 @@ class WorkflowCoordinator:
         
         print(f"📝 Plan: {len(review.get('action_plan', []))} steps")
         
-        # Step 5: Execute changes
-        print("🚀 Executing changes...")
-        execution = agent3.execute_changes(review, repo_url)
+        # Step 5: Execute changes (using review mode by default for coordinator)
+        print("🚀 Implementing changes...")
+        implementation = agent3.execute_and_review(review, repo_url)
         
-        print(f"✅ Execution complete: {execution.get('status', 'unknown')}")
+        print(f"✅ Implementation complete: {implementation.get('status', 'unknown')}")
         
         return {
             "status": "completed",
             "selected_issue": selected_issue,
             "analysis": analysis,
             "review": review,
-            "execution": execution
+            "implementation": implementation
         } 

@@ -103,7 +103,7 @@ def run_agents_on_issue(repo_url, issue_id):
     
     # Run Agents 2 & 3 in parallel
     agent2 = FeasibilityAnalyzerAgent()
-    agent3 = FileReviewerAgent()
+    agent3 = FileReviewerAgent()  # Remove the api_token parameter
     result_queue = Queue()
     
     thread2 = threading.Thread(target=run_agent_2, args=(agent2, issue, repo_url, result_queue))
@@ -119,6 +119,7 @@ def run_agents_on_issue(repo_url, issue_id):
     agent2_completed = False
     agent3_completed = False
     
+    # Wait for both agents, but always show feasibility first
     while not (agent2_completed and agent3_completed):
         try:
             agent_type, result, error = result_queue.get(timeout=1)
@@ -144,13 +145,16 @@ def run_agents_on_issue(repo_url, issue_id):
                 print("❌ Agent 3 failed")
                 return
     
-    # Show results
-    if analysis:
-        print(f"📊 Feasibility: {analysis.get('feasibility_score', 0)}/100")
-        if analysis.get('feasibility_score', 0) < 50:
-            print("⚠️  Low feasibility score")
+    # Always show feasibility first, then ask to continue
+    print(f"📊 Feasibility: {analysis.get('feasibility_score', 0)}/100")
+    if analysis.get('feasibility_score', 0) < 50:
+        print("⚠️  Low feasibility score")
     
-    # Show plan and ask for approval
+    choice = input("Continue with planning? (y/n): ").strip().lower()
+    if choice != 'y':
+        return
+    
+    # Show plan and ask for final approval
     if plan:
         print(f"\n📋 Plan Summary: {plan.get('summary', 'No summary available')}")
         print(f"📈 Estimated Effort: {plan.get('estimated_effort', 'Unknown')}")
@@ -167,26 +171,27 @@ def run_agents_on_issue(repo_url, issue_id):
         
         print("\n" + "="*80)
     
-    if not input("🚀 Execute plan of action? (y/n): ").strip().lower() == 'y':
-        if agent3._current_session_id:
-            cancel_session(agent3._current_session_id)
-        return
+    print("\n🚀 Execute and push changes?")
+    print("1. Yes, execute and push")
+    print("2. Cancel")
     
-    # Execute
-    print("⚡ Executing...")
-    execution_result = agent3.execute_changes(plan, repo_url)
-    
-    if execution_result.get("status") == "changes_made":
-        print(f"✅ Changes made: {execution_result.get('new_branch', 'unknown')}")
-        
-        if input("📤 Push to GitHub? (y/n): ").strip().lower() == 'y':
-            push_result = agent3.push(execution_result, repo_url)
+    while True:
+        choice = input("Enter choice (1/2): ").strip()
+        if choice == "1":
+            # Execute and push immediately
+            print("⚡ Executing and pushing...")
+            push_result = agent3.execute_and_push(plan, repo_url)
             if push_result.get("status") == "success":
-                print(f"✅ Pushed: {push_result.get('pr_url', 'No PR URL')}")
+                print(f"✅ Pushed successfully!")
             else:
                 print(f"❌ Push failed: {push_result.get('reason', 'Unknown')}")
-    else:
-        print(f"❌ Execution failed: {execution_result.get('reason', 'Unknown')}")
+            break
+        elif choice == "2":
+            if agent3._current_session_id:
+                cancel_session(agent3._current_session_id)
+            return
+        else:
+            print("❌ Please enter 1 or 2")
 
 
 def main():
