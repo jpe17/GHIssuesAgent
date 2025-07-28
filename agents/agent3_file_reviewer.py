@@ -18,28 +18,29 @@ class FileReviewerAgent:
     
     def review_files_and_plan(self, issue_data: Dict, repo_url: str) -> Dict:
         """Review files and create an implementation plan."""
-        issue_number = issue_data.get("issue_number", "unknown")
+        issue_number = issue_data.get("number", "unknown")
         print(f"Agent 3: Creating plan for issue #{issue_number}")
         
-        # Prepare issue data for analysis
+        # Prepare issue data for analysis (using original issue fields)
         issue_info = {
-            "number": issue_number,
-            "title": issue_data.get("issue_title"),
-            "url": issue_data.get("issue_url"),
-            "feasibility_score": issue_data.get("feasibility_score"),
-            "complexity_score": issue_data.get("complexity_score"),
-            "scope_assessment": issue_data.get("scope_assessment"),
-            "technical_analysis": issue_data.get("technical_analysis")
+            "number": issue_data.get("number"),
+            "title": issue_data.get("title"),
+            "body": issue_data.get("body"),
+            "url": issue_data.get("html_url"),
+            "labels": [label.get("name") for label in issue_data.get("labels", [])],
+            "state": issue_data.get("state"),
+            "created_at": issue_data.get("created_at"),
+            "updated_at": issue_data.get("updated_at")
         }
         
         # Create session with issue data in prompt
         prompt = f"""
-        Create an implementation plan for this issue.
+        Create an implementation plan for this GitHub issue.
         
         Repository: {repo_url}
         Issue Info: {json.dumps(issue_info, indent=2)}
         
-        Analyze the repository and create a detailed implementation plan.
+        TASK: Analyze the repository and create a detailed implementation plan.
         
         Save plan as "plan.json" with this format:
         {{
@@ -53,7 +54,7 @@ class FileReviewerAgent:
             "dependencies": ["dep1", "dep2"]
         }}
         
-        DO NOT implement anything. Only create the plan document.
+        Save the plan as "plan.json" attachment and mark the task as done.
         """
         
         self._current_session_id = create_devin_session(prompt, repo_url)
@@ -61,36 +62,10 @@ class FileReviewerAgent:
         
         # Extract plan data from attachments
         message_attachments = result.get("message_attachments", [])
-        downloaded_files = download_json_attachments(message_attachments, "plan")
+        plan_data = download_json_attachments(message_attachments, "plan")
         
-        if not downloaded_files:
-            # Try to extract from message content as fallback
-            from utils.utils import extract_json_from_message_content
-            messages = result.get("messages", [])
-            plan_data = None
-            
-            for msg in messages:
-                if msg.get("type") == "devin_message":
-                    content = msg.get("message", "")
-                    plan_data = extract_json_from_message_content(content)
-                    if plan_data:
-                        print("Found plan in message content")
-                        break
-            
-            if not plan_data:
-                raise ValueError("No plan JSON found in Devin session result")
-        else:
-            plan_data = downloaded_files[0]["data"]
-        
-        # Display plan
-        print("\n=== IMPLEMENTATION PLAN ===")
-        if "action_plan" in plan_data:
-            for i, step in enumerate(plan_data["action_plan"], 1):
-                print(f"{i}. {step.get('description', 'No description')}")
-                if step.get('files'):
-                    print(f"   Files: {', '.join(step['files'])}")
-        else:
-            print(json.dumps(plan_data, indent=2))
+        if not plan_data:
+            raise ValueError("No plan JSON file found in Devin session result")
         
         return plan_data
     
@@ -131,22 +106,51 @@ class FileReviewerAgent:
         
         # Extract execution results
         message_attachments = result.get("message_attachments", [])
-        downloaded_files = download_json_attachments(message_attachments, "execution")
+        execution_data = download_json_attachments(message_attachments, "execution")
         
-        if not downloaded_files:
+        if not execution_data:
             raise ValueError("No execution JSON file found in session result")
         
-        execution_data = downloaded_files[0]["data"]
+        return execution_data
+    
+    def push(self, execution_data: Dict, repo_url: str) -> Dict:
+        """Push the changes to GitHub and create a pull request."""
+        print("\nAgent 3: Pushing changes to GitHub...")
         
-        # Display results
-        print("\n=== EXECUTION RESULTS ===")
-        print(f"Status: {execution_data.get('status', 'unknown')}")
-        print(f"Branch: {execution_data.get('new_branch', 'unknown')}")
-        print(f"Commit: {execution_data.get('commit_message', 'unknown')}")
+        if not self._current_session_id:
+            raise ValueError("No active session. Run review_files_and_plan() first.")
         
-        if "changes_made" in execution_data:
-            print("\nChanges made:")
-            for change in execution_data["changes_made"]:
-                print(f"• {change.get('file', 'unknown')}: {change.get('changes', 'unknown')}")
+        push_message = f"""
+        PUSH: The user approved the execution. Push the changes to GitHub now.
         
-        return execution_data 
+        Execution data: {json.dumps(execution_data)}
+        
+        You must:
+        1. Push the current branch to GitHub
+        2. Create a pull request with a descriptive title and description
+        3. Save push results as JSON attachment named "push.json"
+        4. STOP
+        
+        The push results should include:
+        - status: "success" or "failed"
+        - pr_url: URL of the created pull request
+        - branch_name: name of the pushed branch
+        - reason: error message if failed
+        
+        Save as "push.json" attachment, then STOP.
+        """
+        
+        success = send_session_message(self._current_session_id, push_message)
+        if not success:
+            raise ValueError("Failed to send push command")
+        
+        result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
+        
+        # Extract push results
+        message_attachments = result.get("message_attachments", [])
+        push_data = download_json_attachments(message_attachments, "push")
+        
+        if not push_data:
+            raise ValueError("No push JSON file found in session result")
+        
+        return push_data 

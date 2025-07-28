@@ -13,6 +13,12 @@ def get_cache_key(repo_url: str) -> str:
     return repo_url.replace("https://github.com/", "").replace("/", "_")
 
 
+def get_issue_file_path(cache_dir: str, repo_url: str, issue_id: int) -> str:
+    """Generate the file path for a specific issue in cache."""
+    repo_key = get_cache_key(repo_url)
+    return os.path.join(cache_dir, "issues", repo_key, f"issue_{issue_id}.json")
+
+
 def download_attachment(uuid: str, name: str) -> Optional[str]:
     """Download an attachment from Devin."""
     download_url = f"{DEVIN_API_BASE}/attachments/{uuid}/{name}"
@@ -27,9 +33,8 @@ def download_attachment(uuid: str, name: str) -> Optional[str]:
         return None
 
 
-def download_json_attachments(message_attachments: List[Dict], name_filter: str = None) -> List[Dict]:
+def download_json_attachments(message_attachments: List[Dict], name_filter: str = None) -> Optional[Dict]:
     """Download JSON files from message attachments and return parsed data."""
-    results = []
     
     for attachment in message_attachments:
         name = attachment.get("name", "")
@@ -41,12 +46,11 @@ def download_json_attachments(message_attachments: List[Dict], name_filter: str 
         content = download_attachment(attachment["uuid"], name)
         if content:
             try:
-                data = json.loads(content)
-                results.append({"name": name, "data": data})
+                return json.loads(content)
             except json.JSONDecodeError:
                 continue
     
-    return results
+    return None
 
 
 def extract_attachment_urls_from_messages(messages: List[Dict]) -> List[Dict]:

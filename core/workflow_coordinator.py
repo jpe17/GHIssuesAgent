@@ -8,61 +8,48 @@ from agents.agent3_file_reviewer import FileReviewerAgent
 class WorkflowCoordinator:
     """Simple workflow coordinator."""
     
-    def run_full_workflow(self, repo_url: str, user_input: str = "") -> dict:
+    def run_full_workflow(self, repo_url: str, issue_number: int = None) -> dict:
         """Run the simple workflow: Agent 1 -> Agent 2 -> Agent 3."""
         
         # Step 1: Get issues
-        print("Fetching issues...")
+        print("🔄 Fetching issues...")
         agent1 = IssueFetcherAgent()
         issues = agent1.fetch_and_cache_issues(repo_url)
         if not issues:
             return {"error": "No issues found"}
         
-        # Show available issues
-        print("\nAvailable issues:")
-        for i, issue in enumerate(issues[:10]):  # Show first 10
-            print(f"{i+1}. #{issue.get('number')}: {issue.get('title')}")
+        # Step 2: Select issue (use provided number or first issue)
+        if issue_number:
+            selected_issue = next((issue for issue in issues if issue.get('number') == issue_number), issues[0])
+        else:
+            selected_issue = issues[0]
         
-        # Step 2: User picks issue
-        choice = input("\nPick issue (1-10): ").strip()
-        if not choice.isdigit() or int(choice) < 1 or int(choice) > min(10, len(issues)):
-            return {"error": "Invalid choice"}
-        
-        selected_issue = issues[int(choice) - 1]
-        print(f"Selected: #{selected_issue.get('number')}: {selected_issue.get('title')}")
+        print(f"📋 Selected issue: #{selected_issue.get('number')}: {selected_issue.get('title')}")
         
         # Step 3: Analyze feasibility
-        print("Analyzing feasibility...")
+        print("🔍 Analyzing feasibility...")
         agent2 = FeasibilityAnalyzerAgent()
         analysis = agent2.analyze_issue_feasibility(selected_issue, repo_url)
         
-        # Show analysis
-        print(f"\nFeasibility Score: {analysis.get('feasibility_score', 0)}/100")
-        print(f"Complexity Score: {analysis.get('complexity_score', 0)}/100")
-        print(f"Confidence: {analysis.get('confidence', 0)}/100")
+        print(f"📊 Feasibility: {analysis.get('feasibility_score', 0)}/100")
         
         # Step 4: Review files and plan
-        print("Reviewing files...")
+        print("📁 Reviewing files...")
         agent3 = FileReviewerAgent()
         review = agent3.review_files_and_plan(analysis, repo_url)
         
-        # Show plan
-        print("\nPlan:")
-        for step in review.get("action_plan", []):
-            print(f"• {step.get('description', 'No description')}")
+        print(f"📝 Plan: {len(review.get('action_plan', []))} steps")
         
-        # Step 5: Execute?
-        proceed = input("\nExecute? (y/n): ").strip().lower()
-        if proceed != 'y':
-            return {"status": "cancelled"}
+        # Step 5: Execute changes
+        print("🚀 Executing changes...")
+        execution = agent3.execute_changes(review, repo_url)
         
-        # Step 6: Execute
-        print("Executing...")
-        result = agent3.execute_changes(review, repo_url, user_approval=True)
+        print(f"✅ Execution complete: {execution.get('status', 'unknown')}")
         
         return {
             "status": "completed",
             "selected_issue": selected_issue,
             "analysis": analysis,
-            "execution": result
+            "review": review,
+            "execution": execution
         } 

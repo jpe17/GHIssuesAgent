@@ -74,12 +74,10 @@ class FeasibilityAnalyzerAgent:
         
         # Extract analysis data using utils
         message_attachments = result.get("message_attachments", [])
-        downloaded_files = download_json_attachments(message_attachments, "analysis")
+        analysis_data = download_json_attachments(message_attachments, "analysis")
         
-        if not downloaded_files:
+        if not analysis_data:
             raise ValueError("No analysis JSON file found in Devin session result")
-        
-        analysis_data = downloaded_files[0]["data"]
         
         # Add issue metadata to the result
         analysis_data.update({

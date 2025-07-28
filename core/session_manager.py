@@ -1,19 +1,16 @@
 """Session management for Devin API."""
 
 import time
-import os
 import requests
 from utils.config import DEVIN_API_BASE, DEVIN_API_KEY
 from utils.utils import extract_attachments_from_session_data
 
 
-def create_devin_session(prompt: str, repo_url: str = None, file_url: str = None) -> str:
+def create_devin_session(prompt: str, repo_url: str = None) -> str:
     """Create a Devin session and return session ID."""
     payload = {"prompt": prompt}
     if repo_url:
         payload["repository_url"] = repo_url
-    if file_url:
-        payload["file_url"] = file_url
     
     headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
     
@@ -69,23 +66,12 @@ def display_live_messages(session_id: str, last_message_count: int = 0) -> int:
             message_type = message.get("type", "unknown")
             content = message.get("message", "")
             
-            # Format the message based on type
             if message_type == "devin_message":
-                # Split long messages for better readability
-                if len(content) > 200:
-                    lines = content.split('\n')
-                    print(f"🤖 Devin:")
-                    for line in lines:
-                        if line.strip():
-                            print(f"   {line}")
-                else:
-                    print(f"🤖 Devin: {content}")
+                print(f"🤖 Devin: {content}")
             elif message_type == "user_message":
                 print(f"👤 User: {content}")
             elif message_type == "system_message":
                 print(f"⚙️  System: {content}")
-            else:
-                print(f"❓ {message_type}: {content}")
         
         return len(messages)
     
@@ -104,15 +90,13 @@ def send_session_message(session_id: str, message: str) -> bool:
         )
         response.raise_for_status()
         return True
-    except requests.exceptions.RequestException as e:
-        # Don't print verbose error details
+    except requests.exceptions.RequestException:
         return False
 
 
 def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
     """Wait for session to complete and return result."""
     start_time = time.time()
-    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
     last_message_count = 0
     last_status = None
     
@@ -121,15 +105,12 @@ def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: 
             return {"error": "timeout"}
         
         try:
-            response = requests.get(f"{DEVIN_API_BASE}/session/{session_id}", headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            status = data.get("status_enum")
+            session_data = get_session_details(session_id)
+            status = session_data.get("status_enum")
             
             # Show status changes
-            if status != last_status:
-                if show_live:
-                    display_session_status(session_id)
+            if status != last_status and show_live:
+                display_session_status(session_id)
                 last_status = status
             
             # Display live messages if requested
@@ -137,11 +118,11 @@ def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: 
                 last_message_count = display_live_messages(session_id, last_message_count)
             
             if status in ["completed", "failed", "stopped", "blocked"]:
-                # Extract all attachments from session data
-                attachments = extract_attachments_from_session_data(data)
+                # Extract attachments from session data
+                attachments = extract_attachments_from_session_data(session_data)
                 if attachments:
-                    data["message_attachments"] = attachments
-                return data
+                    session_data["message_attachments"] = attachments
+                return session_data
         except requests.exceptions.RequestException as e:
             print(f"Error checking session status: {e}")
         
