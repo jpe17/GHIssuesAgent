@@ -13,7 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.agent1_issue_fetcher import IssueFetcherAgent
 from agents.agent2_feasibility_analyzer import FeasibilityAnalyzerAgent
-from agents.agent3_file_reviewer import FileReviewerAgent
+from agents.agent3_plan import PlanAgent
+from agents.agent4_executor import ExecutorAgent
 from utils.utils import cancel_session, get_issue_file_path
 
 
@@ -103,7 +104,7 @@ def run_agents_on_issue(repo_url, issue_id):
     
     # Run Agents 2 & 3 in parallel
     agent2 = FeasibilityAnalyzerAgent()
-    agent3 = FileReviewerAgent()  # Remove the api_token parameter
+    agent3 = PlanAgent()  # Remove the api_token parameter
     result_queue = Queue()
     
     thread2 = threading.Thread(target=run_agent_2, args=(agent2, issue, repo_url, result_queue))
@@ -180,7 +181,8 @@ def run_agents_on_issue(repo_url, issue_id):
         if choice == "1":
             # Execute and push immediately
             print("⚡ Executing and pushing...")
-            push_result = agent3.execute_and_push(plan, repo_url)
+            agent4 = ExecutorAgent()
+            push_result = agent4.execute_and_push(plan, repo_url)
             if push_result.get("status") == "success":
                 print(f"✅ Pushed successfully!")
             else:

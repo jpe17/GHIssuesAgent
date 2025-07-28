@@ -120,7 +120,8 @@ GHIssuesAgent/
 ├── api/                           # AI and GitHub integration
 │   ├── agent1_issue_fetcher.py   # Agent 1: Issue fetching
 │   ├── agent2_feasibility_analyzer.py # Agent 2: Feasibility analysis
-│   ├── agent3_file_reviewer.py   # Agent 3: File review & execution
+│   ├── agent3_plan.py            # Agent 3: Implementation planning
+│   ├── agent4_executor.py        # Agent 4: Plan execution & GitHub push
 │   ├── workflow_coordinator.py   # Workflow management
 │   ├── config.py                 # Configuration and environment variables
 │   ├── issues_service.py         # Legacy GitHub issues fetching service
