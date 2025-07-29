@@ -19,6 +19,63 @@ def get_issue_file_path(cache_dir: str, repo_url: str, issue_id: str) -> str:
     return os.path.join(cache_dir, "issues", repo_key, f"issue_{issue_id}.json")
 
 
+def check_cache(cache_file: str) -> Optional[Dict]:
+    """Check if cached data exists and return it if found."""
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as f:
+            return json.load(f)
+    return None
+
+
+def save_to_cache(cache_file: str, data: Dict) -> None:
+    """Save data to cache file."""
+    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+    with open(cache_file, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def prepare_issue_data(issue: Dict) -> Dict:
+    """Prepare issue data for analysis by extracting non-null fields."""
+    return {
+        "number": issue.get("number"),
+        "title": issue.get("title"),
+        "body": issue.get("body"),
+        "labels": [label.get("name") for label in issue.get("labels", [])],
+        "created_at": issue.get("created_at")
+    }
+
+
+def run_devin_session(prompt: str, repo_url: str, timeout: int, show_live: bool = False) -> Dict:
+    """Run a Devin session and return the result."""
+    from core.session_manager import create_devin_session, wait_for_session_completion
+    session_id = create_devin_session(prompt, repo_url)
+    return wait_for_session_completion(session_id, timeout=timeout, show_live=show_live)
+
+
+def run_devin_execution(prompt: str, repo_url: str, timeout: int, show_live: bool = False) -> Dict:
+    """Run a Devin execution session and return the result."""
+    from core.session_manager import create_devin_session, wait_for_execution_completion
+    session_id = create_devin_session(prompt, repo_url)
+    return wait_for_execution_completion(session_id, timeout=timeout, show_live=show_live)
+
+
+def extract_analysis_from_session(result: Dict, analysis_type: str) -> Dict:
+    """Extract analysis data from session result and add issue metadata."""
+    attachments = extract_attachments_from_session_data(result)
+    analysis_files = download_json_attachments(attachments, analysis_type)
+    
+    if not analysis_files:
+        raise ValueError(f"No {analysis_type} JSON file found in Devin session result")
+    
+    return analysis_files[0]["data"]
+
+
+def get_cache_file_path(cache_dir: str, repo_url: str, analysis_type: str, issue_number: str) -> str:
+    """Generate cache file path for analysis results."""
+    repo_key = get_cache_key(repo_url)
+    return os.path.join(cache_dir, f"{analysis_type}_{repo_key}_{issue_number}.json")
+
+
 def download_json_attachments(message_attachments: List[Dict], name_filter: str = None) -> List[Dict]:
     """Download JSON files from message attachments and return list of file info.
     

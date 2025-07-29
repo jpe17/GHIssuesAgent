@@ -1,10 +1,10 @@
 """Agent 2: Calculates feasibility and complexity scores for GitHub issues."""
 
-import json
-import os
 from typing import Dict
-from core.session_manager import create_devin_session, wait_for_session_completion
-from utils.utils import get_cache_key, download_json_attachments, extract_attachments_from_session_data
+from utils.utils import (
+    check_cache, save_to_cache, prepare_issue_data, run_devin_session, 
+    extract_analysis_from_session, get_cache_file_path
+)
 from utils.config import FULL_ANALYSIS_TIMEOUT
 
 
@@ -13,7 +13,6 @@ class FeasibilityAnalyzerAgent:
     
     def __init__(self, cache_dir: str = "cache"):
         self.cache_dir = cache_dir
-        os.makedirs(cache_dir, exist_ok=True)
     
     def analyze_issue_feasibility(self, issue: Dict, repo_url: str) -> Dict:
         """Analyze a single issue for feasibility and complexity."""
@@ -21,27 +20,19 @@ class FeasibilityAnalyzerAgent:
         print(f"Agent 2: Analyzing feasibility for issue #{issue_number}")
         
         # Check cache first
-        cache_file = os.path.join(self.cache_dir, f"feasibility_{get_cache_key(repo_url)}_{issue_number}.json")
-        if os.path.exists(cache_file):
+        cache_file = get_cache_file_path(self.cache_dir, repo_url, "feasibility", issue_number)
+        cached_result = check_cache(cache_file)
+        if cached_result:
             print(f"Found cached analysis for issue #{issue_number}")
-            with open(cache_file, 'r') as f:
-                return json.load(f)
-        
-        # Prepare issue data for analysis (only include non-null fields)
-        issue_data = {
-            "number": issue.get("number"),
-            "title": issue.get("title"),
-            "body": issue.get("body"),
-            "labels": [label.get("name") for label in issue.get("labels", [])],
-            "created_at": issue.get("created_at")
-        }
+            return cached_result
         
         # Analyze with Devin
+        issue_data = prepare_issue_data(issue)
         prompt = f"""
         Analyze this GitHub issue for feasibility and complexity.
         
         Repository: {repo_url}
-        Issue Data: {json.dumps(issue_data, indent=2)}
+        Issue Data: {issue_data}
         
         IMPORTANT: 
         1. Complete the task fully - do not wait for further instructions
@@ -67,27 +58,16 @@ class FeasibilityAnalyzerAgent:
         Save the analysis as "analysis.json" attachment and mark the task as done.
         """
         
-        session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
+        result = run_devin_session(prompt, repo_url, FULL_ANALYSIS_TIMEOUT, show_live=False)
+        analysis_data = extract_analysis_from_session(result, "analysis")
         
-        # Extract analysis data using utils
-        attachments = extract_attachments_from_session_data(result)
-        analysis_files = download_json_attachments(attachments, "analysis")
-        
-        if not analysis_files:
-            raise ValueError("No analysis JSON file found in Devin session result")
-        
-        analysis_data = analysis_files[0]["data"]  # Get first analysis file
-        
-        # Add issue metadata to the result
+        # Add issue metadata and cache
         analysis_data.update({
             "issue_number": issue.get("number"),
             "issue_title": issue.get("title"),
         })
         
-        # Cache the results
-        with open(cache_file, 'w') as f:
-            json.dump(analysis_data, f, indent=2)
+        save_to_cache(cache_file, analysis_data)
         print(f"Cached feasibility analysis for issue #{issue_number}")
         
         return analysis_data 

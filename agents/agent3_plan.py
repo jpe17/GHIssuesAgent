@@ -1,10 +1,11 @@
 """Agent 3: Creates implementation plans for GitHub issues."""
 
 import json
-import os
 from typing import Dict
-from core.session_manager import create_devin_session, wait_for_session_completion
-from utils.utils import download_json_attachments, get_cache_key, extract_attachments_from_session_data
+from utils.utils import (
+    check_cache, save_to_cache, prepare_issue_data, run_devin_session, 
+    extract_analysis_from_session, get_cache_file_path
+)
 from utils.config import FULL_ANALYSIS_TIMEOUT
 
 
@@ -13,9 +14,8 @@ class PlanAgent:
     
     def __init__(self, cache_dir: str = "cache"):
         self.cache_dir = cache_dir
-        os.makedirs(cache_dir, exist_ok=True)
         self._current_session_id = None
-        self._plan_data = None  # Store plan data between sessions
+        self._plan_data = None
     
     def review_files_and_plan(self, issue_data: Dict, repo_url: str) -> Dict:
         """Review files and create an implementation plan."""
@@ -23,24 +23,15 @@ class PlanAgent:
         print(f"Agent 3: Creating plan for issue #{issue_number}")
         
         # Check cache first
-        cache_file = os.path.join(self.cache_dir, f"plan_{get_cache_key(repo_url)}_{issue_number}.json")
-        if os.path.exists(cache_file):
+        cache_file = get_cache_file_path(self.cache_dir, repo_url, "plan", issue_number)
+        cached_result = check_cache(cache_file)
+        if cached_result:
             print(f"Found cached plan for issue #{issue_number}")
-            with open(cache_file, 'r') as f:
-                plan_data = json.load(f)
-                self._plan_data = plan_data
-                return plan_data
-        
-        # Prepare issue data for analysis (only include non-null fields)
-        issue_info = {
-            "number": issue_data.get("number"),
-            "title": issue_data.get("title"),
-            "body": issue_data.get("body"),
-            "labels": [label.get("name") for label in issue_data.get("labels", [])],
-            "created_at": issue_data.get("created_at")
-        }
+            self._plan_data = cached_result
+            return cached_result
         
         # Create session with issue data in prompt
+        issue_info = prepare_issue_data(issue_data)
         prompt = f"""
         TASK: Create a plan for this GitHub issue.
         
@@ -75,33 +66,21 @@ class PlanAgent:
         DO NOT IMPLEMENT ANY CHANGES - ONLY CREATE THE PLAN AND STOP.
         
         Repository: {repo_url}
-        Issue Info: {json.dumps(issue_info, indent=2)}
+        Issue Info: {issue_info}
         """
         
-        self._current_session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
+        result = run_devin_session(prompt, repo_url, FULL_ANALYSIS_TIMEOUT, show_live=False)
+        plan_data = extract_analysis_from_session(result, "plan")
         
-        # Extract plan data from attachments
-        attachments = extract_attachments_from_session_data(result)
-        plan_files = download_json_attachments(attachments, "plan")
-        
-        if not plan_files:
-            raise ValueError("No plan JSON file found in Devin session result")
-        
-        plan_data = plan_files[0]["data"]  # Get first plan file
-        
-        # Add issue metadata to the result
+        # Add issue metadata and cache
         plan_data.update({
             "issue_number": issue_data.get("number"),
             "issue_title": issue_data.get("title"),
         })
         
-        # Cache the results
-        with open(cache_file, 'w') as f:
-            json.dump(plan_data, f, indent=2)
+        save_to_cache(cache_file, plan_data)
         print(f"Cached plan for issue #{issue_number}")
         
-        # Store plan data for later execution
         self._plan_data = plan_data
         return plan_data
     

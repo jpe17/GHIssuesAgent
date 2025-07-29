@@ -305,7 +305,6 @@ async def execute_multiple_issues(request: MultiIssueRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
 # Dependency for Devin session (placeholder)
 def get_devin_session():
     """Get the Devin API session."""

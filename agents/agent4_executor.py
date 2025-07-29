@@ -2,9 +2,8 @@
 
 import json
 from typing import Dict
-from core.session_manager import create_devin_session, wait_for_execution_completion
+from utils.utils import run_devin_execution, extract_pr_url_from_session
 from utils.config import EXECUTION_TIMEOUT
-from utils.utils import extract_pr_url_from_session
 
 
 class ExecutorAgent:
@@ -12,13 +11,11 @@ class ExecutorAgent:
     
     def __init__(self, cache_dir: str = "cache"):
         self.cache_dir = cache_dir
-        self._current_session_id = None
     
     def execute_and_push(self, plan_data: Dict, repo_url: str) -> Dict:
         """Execute the plan and immediately push to GitHub."""
         print("\nAgent 4: Executing plan and pushing to GitHub...")
         
-        # Create a completely new session for execution to avoid context contamination
         execution_prompt = f"""
         EXECUTE_AND_PUSH: Implement the approved plan and push to GitHub.
         
@@ -41,15 +38,12 @@ class ExecutorAgent:
         Start implementing immediately - the plan has been pre-approved.
                 
         Repository: {repo_url}
-        Approved Plan: {json.dumps(plan_data, indent=2)}
+        Approved Plan: {plan_data}
         """
         
-        # Create fresh session for execution
-        execution_session_id = create_devin_session(execution_prompt, repo_url)
-        result = wait_for_execution_completion(execution_session_id, timeout=EXECUTION_TIMEOUT, show_live=True)
-        
-        # Check if we got a PR URL
+        result = run_devin_execution(execution_prompt, repo_url, EXECUTION_TIMEOUT, show_live=True)
         pr_url = extract_pr_url_from_session(result)
+        
         return {
             "status": "success" if pr_url else "failed",
             "session_result": result,
