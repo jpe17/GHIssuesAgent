@@ -53,11 +53,16 @@ def safe_makedirs(path: str) -> bool:
 
 def prepare_issue_data(issue: Dict) -> Dict:
     """Prepare issue data for analysis by extracting non-null fields."""
+    labels = issue.get("labels", [])
+    # Handle both string labels and dict labels (GitHub API can return both formats)
+    if labels and isinstance(labels[0], dict):
+        labels = [label.get("name") for label in labels]
+    
     return {
         "number": issue.get("number"),
         "title": issue.get("title"),
         "body": issue.get("body"),
-        "labels": [label.get("name") for label in issue.get("labels", [])],
+        "labels": labels,
         "created_at": issue.get("created_at")
     }
 

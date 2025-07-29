@@ -1,0 +1,9 @@
+{
+  "number": 3,
+  "title": "Feature Request: Add video section with playable 'Glass Half Empty' video",
+  "body": "# Feature Request: Add video section with playable \"Glass Half Empty\" video\n\n## Description\nAdd a new video section to showcase the \"Glass Half Empty\" video before the \"Get in Touch\" section. The video should be playable with sound when users click on it, but sized appropriately since the video is not high definition.\n\n## Requirements\n- Create a new video section between the current content and the contact section\n- Include the video file: `static/videos/glass_half_empty.mov` (16MB)\n- Video should be clickable to play/pause with sound\n- Video should not be too large since it's not HD quality\n- Add appropriate styling to match the portfolio's design aesthetic\n- Include a title/description for the video section\n\n## Technical Implementation\n- Add a new section before the contact section\n- Use HTML5 `<video>` element with controls\n- Implement custom play/pause functionality if needed\n- Add responsive styling\n- Consider adding a preview thumbnail or play button overlay\n\n## Design Considerations\n- Match the existing portfolio's glass-morphism design theme\n- Ensure the video doesn't overwhelm the page layout\n- Add appropriate spacing and typography\n- Consider adding a brief description or context for the video\n\n## Priority\nLow\n\n## Labels\n- enhancement\n- feature-request\n- video\n- ui/ux ",
+  "created_at": "2025-07-27T07:29:32Z",
+  "labels": [
+    "enhancement"
+  ]
+}

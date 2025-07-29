@@ -17,6 +17,11 @@ class FeasibilityAnalyzerAgent:
     
     def analyze_issue_feasibility(self, issue: Dict, repo_url: str) -> Dict:
         """Analyze a single issue for feasibility and complexity."""
+        # Defensive programming: ensure issue is a dict
+        if isinstance(issue, str):
+            print(f"❌ Error: Expected dict but got string: {issue}")
+            return {"error": "Invalid issue format"}
+        
         issue_number = issue.get("number", "unknown")
         print(f"Agent 2: Analyzing feasibility for issue #{issue_number}")
         

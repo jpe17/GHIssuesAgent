@@ -69,19 +69,22 @@ async def fetch_issues(request: RepoRequest):
         raise HTTPException(status_code=500, detail=f"Failed to fetch issues: {str(e)}")
 
 def analyze_single_issue(repo_url: str, issue_id: str, delay_seconds: float = 0) -> dict:
-    """Analyze a single issue with parallel Agent 2 & 3 execution."""
+    """Analyze a single issue with proper rate limiting."""
     try:
-        # Check if both analyses are cached first
+        # Initial delay before any API calls
+        if delay_seconds > 0:
+            print(f"⏱️  Initial delay: waiting {delay_seconds}s for issue #{issue_id}")
+            time.sleep(delay_seconds)
+        
+        # Check cache status
         from utils.utils import get_cache_file_path, check_cache
         feasibility_cache = get_cache_file_path("cache", repo_url, "feasibility", issue_id)
         plan_cache = get_cache_file_path("cache", repo_url, "plan", issue_id)
         
-        # Only delay if we need to make API calls and delay is requested
-        if delay_seconds > 0 and (not check_cache(feasibility_cache) or not check_cache(plan_cache)):
-            print(f"⏱️  Waiting {delay_seconds}s to avoid rate limiting...")
-            time.sleep(delay_seconds)
-            
-        print(f"🎯 Analyzing issue #{issue_id}")
+        feasibility_cached = check_cache(feasibility_cache)
+        plan_cached = check_cache(plan_cache)
+        
+        print(f"🎯 Analyzing issue #{issue_id} (feasibility_cached: {feasibility_cached}, plan_cached: {plan_cached})")
         
         # Load issue
         issue_file_path = get_issue_file_path("cache", repo_url, issue_id)
@@ -91,30 +94,21 @@ def analyze_single_issue(repo_url: str, issue_id: str, delay_seconds: float = 0)
         with open(issue_file_path, 'r') as f:
             issue = json.load(f)
         
-        # Run Agent 2 & 3 in PARALLEL with staggered start to avoid rate limiting
+        # Run Agent 2 & 3 in parallel with staggered start
         print(f"🚀 Running Agent 2 & 3 in parallel for issue #{issue_id}")
         
         def run_agent2():
+            if not feasibility_cached:
+                time.sleep(2.0)  # 2 second delay before Agent 2
             agent2 = FeasibilityAnalyzerAgent()
-            # Check if we have cached results first
-            from utils.utils import get_cache_file_path, check_cache
-            cache_file = get_cache_file_path("cache", repo_url, "feasibility", issue_id)
-            if not check_cache(cache_file):
-                # Only delay if we need to make API calls
-                time.sleep(3.0)
             return agent2.analyze_issue_feasibility(issue, repo_url)
         
         def run_agent3():
+            if not plan_cached:
+                time.sleep(4.0)  # 4 second delay before Agent 3 (2s after Agent 2)
             agent3 = PlanAgent()
-            # Check if we have cached results first
-            from utils.utils import get_cache_file_path, check_cache
-            cache_file = get_cache_file_path("cache", repo_url, "plan", issue_id)
-            if not check_cache(cache_file):
-                # Only delay if we need to make API calls
-                time.sleep(8.0)
             return agent3.review_files_and_plan(issue, repo_url)
         
-        # Execute both agents in parallel
         with ThreadPoolExecutor(max_workers=2) as executor:
             future_agent2 = executor.submit(run_agent2)
             future_agent3 = executor.submit(run_agent3)
@@ -152,18 +146,19 @@ async def analyze_issue(request: IssueRequest):
 
 @router.post("/api/analyze-multiple-issues")
 async def analyze_multiple_issues(request: MultiIssueRequest):
-    """Analyze multiple issues with rate limiting."""
+    """Analyze multiple issues with conservative rate limiting."""
     try:
-        print(f"🔍 Analyzing {len(request.issue_ids)} issues with rate limiting")
+        print(f"🔍 Analyzing {len(request.issue_ids)} issues with conservative rate limiting")
         
-        # Limit concurrent workers and add progressive delays
-        max_workers = min(len(request.issue_ids), 3)  # Reduced from 5 to 3
+        # Single worker to ensure semaphore works properly
+        # Process issues in parallel with staggered timing
+        max_workers = len(request.issue_ids)
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for i, issue_id in enumerate(request.issue_ids):
-                # Progressive delay: 0s, 5s, 10s, 15s, etc.
-                delay = i * 5.0
+                # 2 second delay between issues
+                delay = i * 2.0
                 future = executor.submit(analyze_single_issue, request.repo_url, issue_id, delay)
                 futures.append(future)
             
@@ -177,11 +172,11 @@ async def analyze_multiple_issues(request: MultiIssueRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 def execute_single_issue(repo_url: str, issue_id: str, delay_seconds: float = 0) -> dict:
-    """Execute a single issue."""
+    """Execute a single issue with proper rate limiting."""
     try:
-        # Add delay to prevent rate limiting
+        # Initial delay before any API calls
         if delay_seconds > 0:
-            print(f"⏱️  Waiting {delay_seconds}s to avoid rate limiting...")
+            print(f"⏱️  Initial delay: waiting {delay_seconds}s for execution of issue #{issue_id}")
             time.sleep(delay_seconds)
             
         print(f"🚀 Executing issue #{issue_id}")
@@ -210,7 +205,8 @@ def execute_single_issue(repo_url: str, issue_id: str, delay_seconds: float = 0)
         return {
             "issue_id": issue_id,
             "status": "completed",
-            "result": push_result
+            "result": push_result,
+            "pr_url": push_result.get("pr_url") if push_result else None
         }
         
     except Exception as e:
@@ -238,14 +234,14 @@ async def execute_multiple_issues(request: MultiIssueRequest):
     try:
         print(f"🚀 Executing {len(request.issue_ids)} issues with rate limiting")
         
-        # Use fewer workers for execution to avoid overwhelming the API
-        max_workers = min(len(request.issue_ids), 2)  # Reduced from 3 to 2
+        # Process issues in parallel with staggered timing
+        max_workers = len(request.issue_ids)
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for i, issue_id in enumerate(request.issue_ids):
-                # Progressive delay: 0s, 8s, 16s, 24s, etc. (longer for execution)
-                delay = i * 8.0
+                # 2 second delay between issues
+                delay = i * 2.0
                 future = executor.submit(execute_single_issue, request.repo_url, issue_id, delay)
                 futures.append(future)
             

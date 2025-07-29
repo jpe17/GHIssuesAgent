@@ -147,6 +147,14 @@ const App = {
             return;
         }
 
+        // Show execution section with coffee message
+        document.getElementById('executionSection').style.display = 'block';
+        document.getElementById('executionLoading').style.display = 'block';
+        document.getElementById('executionResult').style.display = 'none';
+        
+        // Scroll to execution section
+        document.getElementById('executionSection').scrollIntoView({ behavior: 'smooth' });
+
         const btn = document.getElementById('executeBtn');
         this.setLoading(btn, 'Executing...');
 
@@ -163,14 +171,39 @@ const App = {
             if (!response.ok) throw new Error('Failed to execute changes');
 
             const data = await response.json();
+            
+            // Hide loading and show results
+            document.getElementById('executionLoading').style.display = 'none';
+            document.getElementById('executionResult').style.display = 'block';
+            
             if (data.status === 'completed') {
-                this.showMessage(`Execution completed for issue #${this.state.currentIssueId}! Check the Devin frontend for results.`, 'success');
+                let message = `<div style="text-align: center;">
+                    <h3 style="color: #28a745; margin-bottom: 16px;">🎉 Execution Completed!</h3>
+                    <p style="margin-bottom: 16px;">Issue #${this.state.currentIssueId} has been successfully implemented.</p>`;
+                
+                if (data.pr_url) {
+                    message += `<a href="${data.pr_url}" target="_blank" class="btn btn-primary" style="margin-top: 16px;">
+                        <span>🔗</span> View Pull Request
+                    </a>`;
+                } else {
+                    message += '<p style="color: #6c757d;">Check the Devin frontend for detailed results.</p>';
+                }
+                message += '</div>';
+                
+                document.getElementById('executionResult').innerHTML = message;
                 btn.innerHTML = '✅ Completed';
             } else {
                 throw new Error('Execution failed');
             }
         } catch (error) {
-            this.showMessage('Failed to execute changes: ' + error.message, 'error');
+            // Hide loading and show error
+            document.getElementById('executionLoading').style.display = 'none';
+            document.getElementById('executionResult').style.display = 'block';
+            document.getElementById('executionResult').innerHTML = `
+                <div style="text-align: center;">
+                    <h3 style="color: #dc3545; margin-bottom: 16px;">❌ Execution Failed</h3>
+                    <p>${error.message}</p>
+                </div>`;
             btn.innerHTML = '❌ Failed';
         } finally {
             btn.disabled = false;
@@ -196,7 +229,13 @@ const App = {
             const data = await response.json();
             if (data.status === 'completed') {
                 btn.innerHTML = '✅ Completed';
-                this.showMessage(`Execution completed for issue #${issueId}! Check the Devin frontend for results.`, 'success');
+                let message = `Execution completed for issue #${issueId}!`;
+                if (data.pr_url) {
+                    message += ` <a href="${data.pr_url}" target="_blank" style="color: #0066cc; text-decoration: underline;">View Pull Request</a>`;
+                } else {
+                    message += ' Check the Devin frontend for results.';
+                }
+                this.showMessage(message, 'success');
             } else {
                 throw new Error('Execution failed');
             }
@@ -336,8 +375,8 @@ const App = {
                     <div style="font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Potential Risks</div>
                     <ul style="list-style: none; padding: 0; margin: 0;">
                         ${analysis.technical_analysis.risks.map(risk => `
-                            <li style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.875rem;">
-                                <span style="color: var(--danger); margin-right: 8px;">⚠️</span>
+                            <li style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.875rem;">
+                                <span style="color: #f59e0b; margin-right: 8px;">⚠️</span>
                                 ${risk}
                             </li>
                         `).join('')}
@@ -477,8 +516,8 @@ const App = {
                                 <div style="font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Potential Risks</div>
                                 <ul style="list-style: none; padding: 0; margin: 0;">
                                     ${analysis.technical_analysis.risks.map(risk => `
-                                        <li style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.875rem;">
-                                            <span style="color: var(--danger); margin-right: 8px;">⚠️</span>
+                                        <li style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.875rem;">
+                                            <span style="color: #f59e0b; margin-right: 8px;">⚠️</span>
                                             ${risk}
                                         </li>
                                     `).join('')}
