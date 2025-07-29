@@ -48,6 +48,9 @@ async def shutdown_event():
         await devin_session.close()
         print("🔌 Devin API session closed")
 
+# Vercel requires the app to be named 'app'
+# The app is already defined above as 'app'
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8844)
