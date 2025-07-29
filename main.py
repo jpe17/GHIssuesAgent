@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from app.routes import router, get_devin_session
+from app.routes import router
 import aiohttp
 
 app = FastAPI(
@@ -33,8 +33,7 @@ async def startup_event():
             )
             print("✅ Devin API session initialized")
             
-            # Override the dependency to return our session
-            app.dependency_overrides[get_devin_session] = lambda: devin_session
+            # Session is initialized and ready
         else:
             print("⚠️  No Devin API key found. Set DEVIN_API_KEY environment variable to use AI features.")
     except ImportError:

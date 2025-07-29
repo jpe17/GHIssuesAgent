@@ -44,9 +44,10 @@ class IssueFetcherAgent:
         
         issues = []
         for file_info in downloaded_files:
-            file_path = os.path.join(repo_issues_dir, file_info["name"])
-            save_to_cache(file_path, file_info["data"])
-            issues.append(file_info["data"])
+            if isinstance(file_info, dict) and "name" in file_info and "data" in file_info:
+                file_path = os.path.join(repo_issues_dir, file_info["name"])
+                save_to_cache(file_path, file_info["data"])
+                issues.append(file_info["data"])
         
         # Save to cache
         save_to_cache(cache_file, issues)

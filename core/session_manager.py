@@ -114,7 +114,7 @@ def _wait_for_session_with_custom_check(session_id: str, timeout: int, show_live
         except requests.exceptions.RequestException:
             pass
         
-        time.sleep(30)
+        time.sleep(10)
     
     return {"error": "timeout"}
 

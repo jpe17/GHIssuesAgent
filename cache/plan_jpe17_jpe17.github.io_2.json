@@ -1,0 +1,71 @@
+{
+  "summary": "Fix hero section layout shifts during typing animation by implementing consistent height constraints and optimizing text container dimensions to accommodate all phrase lengths across viewport sizes.",
+  "action_plan": [
+    {
+      "step": 1,
+      "description": "Measure and calculate the exact height requirements for the longest phrase ('Machine Learning Researcher') across all viewport sizes and font scaling",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 2,
+      "description": "Update .hero-title min-height values to accommodate the longest phrase on both desktop (increase from 6rem) and mobile (increase from 4rem) breakpoints",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 3,
+      "description": "Add CSS properties to prevent text wrapping and ensure consistent line-height behavior during text transitions",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 4,
+      "description": "Implement white-space: nowrap and overflow handling for the typing text container to prevent multi-line text issues",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 5,
+      "description": "Add CSS containment properties to isolate the typing animation from affecting surrounding layout",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 6,
+      "description": "Test the typing animation across different viewport sizes to ensure no layout shifts occur during phrase transitions",
+      "files": [
+        "index.html",
+        "static/js/main-static.js",
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 7,
+      "description": "Optimize the typing animation timing to ensure smooth transitions without visible height changes",
+      "files": [
+        "static/js/main-static.js"
+      ]
+    }
+  ],
+  "estimated_effort": "Small",
+  "risks": [
+    "Increasing min-height too much could create excessive white space on shorter phrases",
+    "Mobile viewport constraints might require different approach than desktop",
+    "Font scaling (clamp function) could affect height calculations across viewport sizes",
+    "Changes might affect other hero section elements positioning"
+  ],
+  "dependencies": [
+    "CSS clamp() function behavior across browsers",
+    "Current responsive breakpoint definitions",
+    "Hero section grid layout constraints",
+    "Existing animation performance optimizations"
+  ],
+  "issue_number": 2,
+  "issue_title": "Bug: Hero section moves up and down when typing animation changes text length"
+}

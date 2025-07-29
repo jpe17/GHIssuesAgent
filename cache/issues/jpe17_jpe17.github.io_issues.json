@@ -1,0 +1,44 @@
+[
+  {
+    "number": 1,
+    "title": "Bug: Skills progress bars flicker and move backwards during animation",
+    "body": "# Bug: Skills progress bars flicker and move backwards during animation\n\n## Description\nWhen the skills section loads and the progress bars animate, there's a visual glitch where the bars appear to flicker once and move backwards slightly before completing their animation. This creates a jarring user experience that detracts from the professional appearance of the portfolio.\n\n## Steps to Reproduce\n1. Navigate to the skills section of the portfolio\n2. Scroll down to trigger the skills section animation\n3. Observe the progress bars as they animate from 0% to their target percentage\n4. Notice the flicker and backward movement during the animation\n\n## Expected Behavior\nProgress bars should smoothly animate from 0% to their target percentage without any flickering or backward movement.\n\n## Current Behavior\nProgress bars flicker and move backwards once during the animation sequence.\n\n## Technical Details\n- The issue occurs in the skill bar animation function\n- The animation uses a timeout before setting the final width\n- The flicker likely occurs due to the initial state not being properly set before the animation begins\n\n## Priority\nMedium\n\n## Labels\n- bug\n- animation\n- ui/ux ",
+    "created_at": "2025-07-27T07:29:26Z",
+    "labels": [
+      {
+        "id": "LA_kwDONvbEqs8AAAAB4AfWEQ",
+        "name": "bug",
+        "description": "Something isn't working",
+        "color": "d73a4a"
+      }
+    ]
+  },
+  {
+    "number": 2,
+    "title": "Bug: Hero section moves up and down when typing animation changes text length",
+    "body": "# Bug: Hero section moves up and down when typing animation changes text length\n\n## Description\nThe hero section experiences layout shifts (CLS - Cumulative Layout Shift) when the typing animation changes from shorter to longer text or vice versa. This causes the entire page content to move up and down, creating a \"playful\" but unprofessional bouncing effect that disrupts the user experience.\n\n## Steps to Reproduce\n1. Load the portfolio homepage\n2. Observe the hero section with the typing animation\n3. Watch as the text changes between different phrases of varying lengths\n4. Notice the entire page content moving up and down\n\n## Expected Behavior\nThe hero section should maintain a fixed height that accommodates the longest possible text, preventing any layout shifts during the typing animation.\n\n## Current Behavior\nThe hero section dynamically adjusts its height based on the current text being displayed, causing the page to bounce up and down.\n\n## Technical Details\n- The typing effect cycles through phrases of varying lengths\n- Phrases include: \"Machine Learning Researcher\" (long), \"Engineering Lead\" (short), \"Co-Founder & CTO\" (medium), \"Solution Architect\" (medium), \"Python Developer\" (short)\n- The layout shift occurs because the container height changes with the text content\n\n## Suggested Solution\nSet a fixed height for the typing text container that accommodates the longest phrase, or use CSS to prevent layout shifts.\n\n## Priority\nMedium\n\n## Labels\n- bug\n- layout-shift\n- ui/ux\n- performance ",
+    "created_at": "2025-07-27T07:29:29Z",
+    "labels": [
+      {
+        "id": "LA_kwDONvbEqs8AAAAB4AfWEQ",
+        "name": "bug",
+        "description": "Something isn't working",
+        "color": "d73a4a"
+      }
+    ]
+  },
+  {
+    "number": 3,
+    "title": "Feature Request: Add video section with playable 'Glass Half Empty' video",
+    "body": "# Feature Request: Add video section with playable \"Glass Half Empty\" video\n\n## Description\nAdd a new video section to showcase the \"Glass Half Empty\" video before the \"Get in Touch\" section. The video should be playable with sound when users click on it, but sized appropriately since the video is not high definition.\n\n## Requirements\n- Create a new video section between the current content and the contact section\n- Include the video file: `static/videos/glass_half_empty.mov` (16MB)\n- Video should be clickable to play/pause with sound\n- Video should not be too large since it's not HD quality\n- Add appropriate styling to match the portfolio's design aesthetic\n- Include a title/description for the video section\n\n## Technical Implementation\n- Add a new section before the contact section\n- Use HTML5 `<video>` element with controls\n- Implement custom play/pause functionality if needed\n- Add responsive styling\n- Consider adding a preview thumbnail or play button overlay\n\n## Design Considerations\n- Match the existing portfolio's glass-morphism design theme\n- Ensure the video doesn't overwhelm the page layout\n- Add appropriate spacing and typography\n- Consider adding a brief description or context for the video\n\n## Priority\nLow\n\n## Labels\n- enhancement\n- feature-request\n- video\n- ui/ux ",
+    "created_at": "2025-07-27T07:29:32Z",
+    "labels": [
+      {
+        "id": "LA_kwDONvbEqs8AAAAB4AfWIw",
+        "name": "enhancement",
+        "description": "New feature or request",
+        "color": "a2eeef"
+      }
+    ]
+  }
+]

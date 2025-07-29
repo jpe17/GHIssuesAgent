@@ -1,6 +1,6 @@
 """Simple FastAPI routes for GitHub Issues Agent frontend."""
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List
@@ -8,8 +8,6 @@ import json
 import os
 import sys
 import time
-import asyncio
-import threading
 from concurrent.futures import ThreadPoolExecutor
 
 # Add the parent directory to Python path
@@ -23,7 +21,7 @@ from utils.utils import get_issue_file_path
 
 router = APIRouter()
 
-# Simple request models
+# Request models
 class RepoRequest(BaseModel):
     repo_url: str
 
@@ -45,13 +43,12 @@ async def get_index():
 async def fetch_issues(request: RepoRequest):
     """Fetch issues from a repository."""
     try:
-        print(f"🔄 Starting fetch for: {request.repo_url}")
+        print(f"🔄 Fetching issues from: {request.repo_url}")
         
-        # Use the issue fetcher agent directly
         agent = IssueFetcherAgent()
-        issues_data = agent.fetch_issues(request.repo_url)
+        issues_data = agent.fetch_and_cache_issues(request.repo_url)
         
-        # Convert to the expected format
+        # Convert to frontend format
         issues = []
         for issue_data in issues_data:
             issues.append({
@@ -63,23 +60,28 @@ async def fetch_issues(request: RepoRequest):
                 "updated_at": issue_data.get('updated_at', '')
             })
         
-        # Sort by issue number
         issues.sort(key=lambda x: int(x["id"]))
-        
-        print(f"✅ Successfully fetched {len(issues)} issues")
+        print(f"✅ Fetched {len(issues)} issues")
         return {"issues": issues}
             
     except Exception as e:
         print(f"❌ Error fetching issues: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch issues: {str(e)}")
 
-def analyze_single_issue(repo_url: str, issue_id: str) -> dict:
-    """Analyze a single issue (for parallel processing)."""
-    import threading
-    thread_id = threading.current_thread().ident
-    
+def analyze_single_issue(repo_url: str, issue_id: str, delay_seconds: float = 0) -> dict:
+    """Analyze a single issue with parallel Agent 2 & 3 execution."""
     try:
-        print(f"🎯 Starting analysis for issue #{issue_id} (Thread: {thread_id})")
+        # Check if both analyses are cached first
+        from utils.utils import get_cache_file_path, check_cache
+        feasibility_cache = get_cache_file_path("cache", repo_url, "feasibility", issue_id)
+        plan_cache = get_cache_file_path("cache", repo_url, "plan", issue_id)
+        
+        # Only delay if we need to make API calls and delay is requested
+        if delay_seconds > 0 and (not check_cache(feasibility_cache) or not check_cache(plan_cache)):
+            print(f"⏱️  Waiting {delay_seconds}s to avoid rate limiting...")
+            time.sleep(delay_seconds)
+            
+        print(f"🎯 Analyzing issue #{issue_id}")
         
         # Load issue
         issue_file_path = get_issue_file_path("cache", repo_url, issue_id)
@@ -89,38 +91,38 @@ def analyze_single_issue(repo_url: str, issue_id: str) -> dict:
         with open(issue_file_path, 'r') as f:
             issue = json.load(f)
         
-        # Run Agents 2 & 3 in parallel using asyncio
-        print(f"🚀 Creating Agent 2 & 3 sessions for issue #{issue_id} (Thread: {thread_id})")
+        # Run Agent 2 & 3 in PARALLEL with staggered start to avoid rate limiting
+        print(f"🚀 Running Agent 2 & 3 in parallel for issue #{issue_id}")
         
-        async def run_parallel_analysis():
-            loop = asyncio.get_event_loop()
-            
-            # Start both agents simultaneously
-            agent2_task = loop.run_in_executor(None, lambda: FeasibilityAnalyzerAgent().analyze_issue_feasibility(issue, repo_url))
-            agent3_task = loop.run_in_executor(None, lambda: PlanAgent().review_files_and_plan(issue, repo_url))
-            
-            # Wait for both to complete
-            analysis, plan = await asyncio.gather(agent2_task, agent3_task)
-            return analysis, plan
+        def run_agent2():
+            agent2 = FeasibilityAnalyzerAgent()
+            # Check if we have cached results first
+            from utils.utils import get_cache_file_path, check_cache
+            cache_file = get_cache_file_path("cache", repo_url, "feasibility", issue_id)
+            if not check_cache(cache_file):
+                # Only delay if we need to make API calls
+                time.sleep(3.0)
+            return agent2.analyze_issue_feasibility(issue, repo_url)
         
-        # Run the async function in the current thread
-        try:
-            # Create new event loop for this thread if needed
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            
-            analysis, plan = loop.run_until_complete(run_parallel_analysis())
-            
-        except Exception as e:
-            print(f"❌ Parallel analysis failed for issue #{issue_id}: {str(e)}")
-            return {"issue_id": issue_id, "error": f"Parallel analysis failed: {str(e)}"}
+        def run_agent3():
+            agent3 = PlanAgent()
+            # Check if we have cached results first
+            from utils.utils import get_cache_file_path, check_cache
+            cache_file = get_cache_file_path("cache", repo_url, "plan", issue_id)
+            if not check_cache(cache_file):
+                # Only delay if we need to make API calls
+                time.sleep(8.0)
+            return agent3.review_files_and_plan(issue, repo_url)
         
-        print(f"✅ Agent 2 completed for issue #{issue_id} (Thread: {thread_id})")
-        print(f"✅ Agent 3 completed for issue #{issue_id} (Thread: {thread_id})")
-        print(f"🎉 Analysis completed for issue #{issue_id} (Thread: {thread_id})")
+        # Execute both agents in parallel
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_agent2 = executor.submit(run_agent2)
+            future_agent3 = executor.submit(run_agent3)
+            
+            analysis = future_agent2.result()
+            plan = future_agent3.result()
+        
+        print(f"✅ Analysis completed for issue #{issue_id}")
         
         return {
             "issue_id": issue_id,
@@ -128,77 +130,61 @@ def analyze_single_issue(repo_url: str, issue_id: str) -> dict:
             "analysis": analysis,
             "plan": plan
         }
+        
     except Exception as e:
-        print(f"💥 Analysis failed for issue #{issue_id} (Thread: {thread_id}): {str(e)}")
+        print(f"❌ Analysis failed for issue #{issue_id}: {str(e)}")
         return {"issue_id": issue_id, "error": str(e)}
 
 @router.post("/api/analyze-issue")
 async def analyze_issue(request: IssueRequest):
     """Analyze a specific issue."""
     try:
-        print(f"🎯 Starting analysis for issue #{request.issue_id}")
-        
-        # Run the analysis directly
         result = analyze_single_issue(request.repo_url, request.issue_id)
         
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
         
-        return {
-            "issue_id": request.issue_id,
-            "status": "completed",
-            "analysis": result.get('analysis'),
-            "plan": result.get('plan')
-        }
+        return result
         
     except Exception as e:
-        print(f"❌ Analysis failed for issue #{request.issue_id}: {str(e)}")
+        print(f"❌ Analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/analyze-multiple-issues")
 async def analyze_multiple_issues(request: MultiIssueRequest):
-    """Analyze multiple issues in parallel."""
+    """Analyze multiple issues with rate limiting."""
     try:
-        print(f"🔍 MULTIPLE ANALYSIS STARTED: {len(request.issue_ids)} issues: {request.issue_ids}")
-        print(f"📍 Repo URL: {request.repo_url}")
+        print(f"🔍 Analyzing {len(request.issue_ids)} issues with rate limiting")
         
-        # Run all issues in parallel with ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=min(len(request.issue_ids), 5)) as executor:
-            print(f"🏭 Created ThreadPoolExecutor with {min(len(request.issue_ids), 5)} workers")
-            
+        # Limit concurrent workers and add progressive delays
+        max_workers = min(len(request.issue_ids), 3)  # Reduced from 5 to 3
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
-            for issue_id in request.issue_ids:
-                print(f"📤 Submitting analysis task for issue #{issue_id}")
-                future = executor.submit(analyze_single_issue, request.repo_url, issue_id)
+            for i, issue_id in enumerate(request.issue_ids):
+                # Progressive delay: 0s, 5s, 10s, 15s, etc.
+                delay = i * 5.0
+                future = executor.submit(analyze_single_issue, request.repo_url, issue_id, delay)
                 futures.append(future)
             
-            print(f"📊 Submitted {len(futures)} tasks to executor")
-            
-            # Collect results as they complete
-            results = []
-            for i, future in enumerate(futures):
-                try:
-                    print(f"⏳ Waiting for result {i+1}/{len(futures)}")
-                    result = future.result()
-                    print(f"✅ Got result for issue: {result.get('issue_id', 'unknown')}")
-                    results.append(result)
-                except Exception as e:
-                    print(f"❌ Error getting result {i+1}: {str(e)}")
-                    results.append({"error": str(e)})
+            results = [future.result() for future in futures]
         
-        print(f"🎉 MULTIPLE ANALYSIS COMPLETED: {len(results)} results")
+        print(f"✅ Completed analysis of {len(results)} issues")
         return {"results": results}
         
     except Exception as e:
-        print(f"💥 MULTIPLE ANALYSIS FAILED: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Multiple analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def execute_single_issue(repo_url: str, issue_id: str) -> dict:
+def execute_single_issue(repo_url: str, issue_id: str, delay_seconds: float = 0) -> dict:
     """Execute a single issue."""
     try:
-        print(f"🚀 Starting execution for issue #{issue_id}")
+        # Add delay to prevent rate limiting
+        if delay_seconds > 0:
+            print(f"⏱️  Waiting {delay_seconds}s to avoid rate limiting...")
+            time.sleep(delay_seconds)
+            
+        print(f"🚀 Executing issue #{issue_id}")
         
         # Load issue
         issue_file_path = get_issue_file_path("cache", repo_url, issue_id)
@@ -208,8 +194,7 @@ def execute_single_issue(repo_url: str, issue_id: str) -> dict:
         with open(issue_file_path, 'r') as f:
             issue = json.load(f)
         
-        # Get plan first
-        print(f"📋 Getting plan for issue #{issue_id}")
+        # Get plan
         agent3 = PlanAgent()
         plan = agent3.review_files_and_plan(issue, repo_url)
         
@@ -217,7 +202,6 @@ def execute_single_issue(repo_url: str, issue_id: str) -> dict:
             return {"issue_id": issue_id, "error": "No plan available"}
         
         # Execute the plan
-        print(f"⚡ Executing plan for issue #{issue_id}")
         agent4 = ExecutorAgent()
         push_result = agent4.execute_and_push(plan, repo_url)
         
@@ -237,81 +221,39 @@ def execute_single_issue(repo_url: str, issue_id: str) -> dict:
 async def execute_changes(request: IssueRequest):
     """Execute the plan and push changes."""
     try:
-        print(f"🚀 Starting execution for issue #{request.issue_id}")
-        
-        # Load cached analysis and plan
-        issue_file = get_issue_file_path(request.repo_url, request.issue_id)
-        
-        if not os.path.exists(issue_file):
-            raise HTTPException(status_code=404, detail="Issue analysis not found. Please analyze the issue first.")
-        
-        with open(issue_file, 'r') as f:
-            cached_data = json.load(f)
-        
-        plan_data = cached_data.get('plan', {})
-        if not plan_data:
-            raise HTTPException(status_code=400, detail="No plan found for this issue.")
-        
-        # Execute the plan
         result = execute_single_issue(request.repo_url, request.issue_id)
         
-        return {
-            "status": "success",
-            "message": f"Execution completed for issue #{request.issue_id}",
-            "result": result
-        }
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return result
         
     except Exception as e:
-        print(f"❌ Error executing changes: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to execute changes: {str(e)}")
+        print(f"❌ Execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/execute-multiple-issues")
 async def execute_multiple_issues(request: MultiIssueRequest):
-    """Execute multiple issues in parallel."""
+    """Execute multiple issues with rate limiting."""
     try:
-        print(f"🚀 MULTIPLE EXECUTION STARTED: {len(request.issue_ids)} issues: {request.issue_ids}")
-        print(f"📍 Repo URL: {request.repo_url}")
+        print(f"🚀 Executing {len(request.issue_ids)} issues with rate limiting")
         
-        # Run all issues in parallel with ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=min(len(request.issue_ids), 3)) as executor:
-            print(f"🏭 Created ThreadPoolExecutor with {min(len(request.issue_ids), 3)} workers")
-            
+        # Use fewer workers for execution to avoid overwhelming the API
+        max_workers = min(len(request.issue_ids), 2)  # Reduced from 3 to 2
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for i, issue_id in enumerate(request.issue_ids):
-                print(f"📤 Submitting execution task for issue #{issue_id}")
-                future = executor.submit(execute_single_issue, request.repo_url, issue_id)
+                # Progressive delay: 0s, 8s, 16s, 24s, etc. (longer for execution)
+                delay = i * 8.0
+                future = executor.submit(execute_single_issue, request.repo_url, issue_id, delay)
                 futures.append(future)
-                
-                # Add delay between submissions to avoid rate limiting
-                if i < len(request.issue_ids) - 1:  # Don't sleep after the last one
-                    print(f"⏸️ Waiting 3 seconds before next execution submission...")
-                    time.sleep(3)  # 3 second delay between executions
             
-            print(f"📊 Submitted {len(futures)} tasks to executor")
-            
-            # Collect results as they complete
-            results = []
-            for i, future in enumerate(futures):
-                try:
-                    print(f"⏳ Waiting for execution result {i+1}/{len(futures)}")
-                    result = future.result()
-                    print(f"✅ Got execution result for issue: {result.get('issue_id', 'unknown')}")
-                    results.append(result)
-                except Exception as e:
-                    print(f"❌ Error getting execution result {i+1}: {str(e)}")
-                    results.append({"error": str(e)})
+            results = [future.result() for future in futures]
         
-        print(f"🎉 MULTIPLE EXECUTION COMPLETED: {len(results)} results")
+        print(f"✅ Completed execution of {len(results)} issues")
         return {"results": results}
         
     except Exception as e:
-        print(f"💥 MULTIPLE EXECUTION FAILED: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Multiple execution failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# Dependency for Devin session (placeholder)
-def get_devin_session():
-    """Get the Devin API session."""
-    return None
