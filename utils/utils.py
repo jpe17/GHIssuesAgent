@@ -18,10 +18,6 @@ def get_issue_file_path(cache_dir: str, repo_url: str, issue_id: str) -> str:
 
 def check_cache(cache_file: str) -> Optional[Dict]:
     """Check if cached data exists and return it if found."""
-    # Skip cache checking in Vercel environment
-    if os.getenv('VERCEL') == '1':
-        return None
-    
     try:
         if os.path.exists(cache_file):
             with open(cache_file, 'r') as f:
@@ -34,10 +30,6 @@ def check_cache(cache_file: str) -> Optional[Dict]:
 
 def save_to_cache(cache_file: str, data: Dict) -> None:
     """Save data to cache file."""
-    # Skip caching in Vercel environment or if filesystem is read-only
-    if os.getenv('VERCEL') == '1':
-        return
-    
     try:
         os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         with open(cache_file, 'w') as f:

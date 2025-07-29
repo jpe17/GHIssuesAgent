@@ -45,15 +45,11 @@ async def get_index():
 async def fetch_issues(request: RepoRequest):
     """Fetch issues from a repository."""
     try:
-        # For Vercel deployment, always fetch fresh issues (no file system caching)
-        print(f"🔄 Fetching fresh issues for: {request.repo_url}")
+        print(f"🔄 Starting fetch for: {request.repo_url}")
         
-        # Fetch issues directly without caching
-        agent1 = IssueFetcherAgent()
-        issues_data = agent1.fetch_and_cache_issues(request.repo_url)
-        
-        if not issues_data:
-            raise HTTPException(status_code=400, detail="Failed to fetch issues")
+        # Use the issue fetcher agent directly
+        agent = IssueFetcherAgent()
+        issues_data = agent.fetch_issues(request.repo_url)
         
         # Convert to the expected format
         issues = []
@@ -72,6 +68,7 @@ async def fetch_issues(request: RepoRequest):
         
         print(f"✅ Successfully fetched {len(issues)} issues")
         return {"issues": issues}
+            
     except Exception as e:
         print(f"❌ Error fetching issues: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch issues: {str(e)}")
@@ -137,23 +134,39 @@ def analyze_single_issue(repo_url: str, issue_id: str) -> dict:
 
 @router.post("/api/analyze-issue")
 async def analyze_issue(request: IssueRequest):
-    """Analyze a specific issue with agents 2 and 3."""
+    """Analyze a specific issue using background function."""
     try:
-        print(f"🎯 Starting individual analysis for issue #{request.issue_id}")
+        print(f"🎯 Starting background analysis for issue #{request.issue_id}")
         
-        # Use asyncio.run_in_executor to offload blocking call to thread
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, analyze_single_issue, request.repo_url, request.issue_id)
+        # Use background function for long-running analysis
+        import requests
+        import json
         
-        if "error" in result:
-            print(f"❌ Individual analysis failed for issue #{request.issue_id}: {result['error']}")
-            raise HTTPException(status_code=404, detail=result["error"])
+        background_url = "https://ghi-ssues-agent-9cjjj1j11-joao-esteves-projects.vercel.app/api/background"
         
-        print(f"✅ Individual analysis completed for issue #{request.issue_id}")
-        return result
+        payload = {
+            "operation": "analyze_issue",
+            "repo_url": request.repo_url,
+            "issue_id": request.issue_id
+        }
+        
+        response = requests.post(background_url, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            analysis_result = result.get('result', {})
+            
+            return {
+                "issue_id": request.issue_id,
+                "status": "completed",
+                "analysis": analysis_result.get('feasibility'),
+                "plan": analysis_result.get('plan')
+            }
+        else:
+            raise HTTPException(status_code=response.status_code, detail=f"Background function failed: {response.text}")
         
     except Exception as e:
-        print(f"💥 Individual analysis failed for issue #{request.issue_id}: {str(e)}")
+        print(f"💥 Background analysis failed for issue #{request.issue_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/analyze-multiple-issues")
@@ -240,20 +253,31 @@ async def execute_changes(request: IssueRequest):
     try:
         print(f"🚀 Starting execution for issue #{request.issue_id}")
         
-        # Use asyncio.run_in_executor to offload blocking call to thread
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, execute_single_issue, request.repo_url, request.issue_id)
+        # Load cached analysis and plan
+        issue_file = get_issue_file_path(request.repo_url, request.issue_id)
         
-        if "error" in result:
-            print(f"❌ Execution failed for issue #{request.issue_id}: {result['error']}")
-            raise HTTPException(status_code=404, detail=result["error"])
+        if not os.path.exists(issue_file):
+            raise HTTPException(status_code=404, detail="Issue analysis not found. Please analyze the issue first.")
         
-        print(f"✅ Execution completed for issue #{request.issue_id}")
-        return result
+        with open(issue_file, 'r') as f:
+            cached_data = json.load(f)
+        
+        plan_data = cached_data.get('plan', {})
+        if not plan_data:
+            raise HTTPException(status_code=400, detail="No plan found for this issue.")
+        
+        # Execute the plan
+        result = execute_single_issue(request.repo_url, request.issue_id)
+        
+        return {
+            "status": "success",
+            "message": f"Execution completed for issue #{request.issue_id}",
+            "result": result
+        }
         
     except Exception as e:
-        print(f"💥 Execution failed for issue #{request.issue_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Error executing changes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute changes: {str(e)}")
 
 @router.post("/api/execute-multiple-issues")
 async def execute_multiple_issues(request: MultiIssueRequest):
@@ -299,6 +323,8 @@ async def execute_multiple_issues(request: MultiIssueRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
 # Dependency for Devin session (placeholder)
 def get_devin_session():
     """Get the Devin API session."""

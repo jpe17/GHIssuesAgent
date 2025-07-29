@@ -69,7 +69,7 @@ class FeasibilityAnalyzerAgent:
             "issue_title": issue.get("title"),
         })
         
-        # Cache the result (skipped in Vercel)
+        # Cache the result
         cache_file = get_cache_file_path(self.cache_dir, repo_url, "feasibility", issue_number)
         save_to_cache(cache_file, analysis_data)
         print(f"Cached feasibility analysis for issue #{issue_number}")
