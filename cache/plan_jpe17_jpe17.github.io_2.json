@@ -1,0 +1,64 @@
+{
+  "summary": "Fix hero section layout shifts during typing animation by implementing consistent height constraints and preventing text wrapping issues across all screen sizes",
+  "action_plan": [
+    {
+      "step": 1,
+      "description": "Calculate optimal fixed heights for typing text container by measuring the longest phrase ('Machine Learning Researcher') across all responsive breakpoints and font sizes",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 2,
+      "description": "Update desktop hero-title CSS to use calculated fixed height instead of min-height, ensuring it accommodates the longest phrase without wrapping",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 3,
+      "description": "Update mobile hero-title CSS (max-width: 768px) to use appropriate fixed height for smaller font sizes and screen widths",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 4,
+      "description": "Add CSS properties to prevent text wrapping and ensure consistent line height behavior (white-space: nowrap, overflow: hidden if needed)",
+      "files": [
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 5,
+      "description": "Test the typing animation across different screen sizes to verify no layout shifts occur during phrase transitions",
+      "files": [
+        "index.html",
+        "static/js/main-static.js",
+        "static/css/main.css"
+      ]
+    },
+    {
+      "step": 6,
+      "description": "Optimize CSS performance by adding contain: layout to typing text elements to isolate layout calculations",
+      "files": [
+        "static/css/main.css"
+      ]
+    }
+  ],
+  "estimated_effort": "Small",
+  "risks": [
+    "Fixed height might create excessive white space on very small screens if not calculated properly",
+    "Text might get cut off on edge cases with very small viewport widths",
+    "Changes could affect other hero section elements' positioning",
+    "Font loading delays could temporarily show incorrect heights before web fonts load"
+  ],
+  "dependencies": [
+    "Need to test across multiple screen sizes (mobile, tablet, desktop)",
+    "Requires browser testing to measure actual rendered text dimensions",
+    "Should verify with different font loading scenarios",
+    "May need to coordinate with any future changes to typing animation phrases"
+  ],
+  "issue_number": 2,
+  "issue_title": "Bug: Hero section moves up and down when typing animation changes text length"
+}

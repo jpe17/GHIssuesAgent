@@ -15,7 +15,8 @@ from agents.agent1_issue_fetcher import IssueFetcherAgent
 from agents.agent2_feasibility_analyzer import FeasibilityAnalyzerAgent
 from agents.agent3_plan import PlanAgent
 from agents.agent4_executor import ExecutorAgent
-from utils.utils import cancel_session, get_issue_file_path
+from utils.utils import get_issue_file_path
+from core.session_manager import cancel_session
 
 
 def run_agent_2(agent2, issue, repo_url, result_queue):

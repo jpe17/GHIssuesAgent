@@ -3,9 +3,10 @@
 import json
 from typing import Dict
 from utils.utils import (
-    check_cache, save_to_cache, prepare_issue_data, run_devin_session, 
-    extract_analysis_from_session, get_cache_file_path
+    check_cache, save_to_cache, prepare_issue_data, 
+    get_cache_file_path
 )
+from core.session_manager import create_devin_session, wait_for_session_completion, extract_json_from_session
 from utils.config import FULL_ANALYSIS_TIMEOUT
 
 
@@ -69,8 +70,9 @@ class PlanAgent:
         Issue Info: {issue_info}
         """
         
-        result = run_devin_session(prompt, repo_url, FULL_ANALYSIS_TIMEOUT, show_live=False)
-        plan_data = extract_analysis_from_session(result, "plan")
+        session_id = create_devin_session(prompt, repo_url)
+        result = wait_for_session_completion(session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
+        plan_data = extract_json_from_session(result, "plan")
         
         # Add issue metadata and cache
         plan_data.update({

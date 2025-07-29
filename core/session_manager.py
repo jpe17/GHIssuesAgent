@@ -2,8 +2,9 @@
 
 import time
 import requests
+import json
+import re
 from utils.config import DEVIN_API_BASE, DEVIN_API_KEY
-from utils.utils import extract_attachments_from_session_data
 
 
 def create_devin_session(prompt: str, repo_url: str = None) -> str:
@@ -14,13 +15,10 @@ def create_devin_session(prompt: str, repo_url: str = None) -> str:
     
     headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
     
-    try:
-        response = requests.post(f"{DEVIN_API_BASE}/sessions", json=payload, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        return data["session_id"]
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"Failed to create session: {e}")
+    response = requests.post(f"{DEVIN_API_BASE}/sessions", json=payload, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+    return data["session_id"]
 
 
 def get_session_details(session_id: str) -> dict:
@@ -31,8 +29,9 @@ def get_session_details(session_id: str) -> dict:
         response = requests.get(f"{DEVIN_API_BASE}/session/{session_id}", headers=headers)
         response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error getting session details: {e}")
+    except requests.exceptions.RequestException:
+        return {}
+    except Exception:
         return {}
 
 
@@ -42,7 +41,6 @@ def display_live_messages(session_id: str, last_message_count: int = 0) -> int:
     messages = session_data.get("messages", [])
     
     if len(messages) > last_message_count:
-        # Display new messages
         for i in range(last_message_count, len(messages)):
             message = messages[i]
             message_type = message.get("type", "unknown")
@@ -76,6 +74,25 @@ def send_session_message(session_id: str, message: str) -> bool:
         return False
 
 
+def cancel_session(session_id: str, max_attempts: int = 30) -> bool:
+    """Cancel a Devin session by sending a cancellation message."""
+    for attempt in range(max_attempts):
+        try:
+            success = send_session_message(
+                session_id, 
+                "STOP: The user has cancelled this operation. Please stop what you are doing and mark the task as cancelled."
+            )
+            if success:
+                return True
+            else:
+                time.sleep(10)
+                
+        except Exception:
+            time.sleep(10)
+    
+    return False
+
+
 def _wait_for_session_with_custom_check(session_id: str, timeout: int, show_live: bool, custom_check=None) -> dict:
     """Helper function to wait for session completion with optional custom check."""
     start_time = time.time()
@@ -85,20 +102,17 @@ def _wait_for_session_with_custom_check(session_id: str, timeout: int, show_live
         try:
             session_data = get_session_details(session_id)
             
-            # Show live messages
             if show_live:
                 last_message_count = display_live_messages(session_id, last_message_count)
             
-            # Run custom check if provided
             if custom_check and custom_check(session_data):
                 return session_data
             
-            # Check if session is done
             if session_data.get("status_enum") in ["completed", "failed", "stopped", "blocked"]:
                 return session_data
                 
         except requests.exceptions.RequestException:
-            print("⚠️  API error, retrying...")
+            pass
         
         time.sleep(30)
     
@@ -110,12 +124,102 @@ def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: 
     return _wait_for_session_with_custom_check(session_id, timeout, show_live)
 
 
+def extract_pr_url_from_session(session_result: dict) -> str | None:
+    """Extract pull request URL from session messages."""
+    messages = session_result.get("messages", [])
+    
+    for message in messages:
+        if message.get("type") == "devin_message":
+            content = message.get("message", "")
+            # Look for PR URL pattern
+            pr_match = re.search(r'https://github\.com/[^/]+/[^/]+/pull/\d+', content)
+            if pr_match:
+                return pr_match.group(0)
+    
+    return None
+
+
+def download_attachment(uuid: str, name: str) -> dict:
+    """Download an attachment from Devin API."""
+    url = f"{DEVIN_API_BASE}/attachments/{uuid}/{name}"
+    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
+    
+    response = requests.get(url, headers=headers, allow_redirects=True)
+    response.raise_for_status()
+    
+    content = response.content
+    return json.loads(content)
+
+
+def extract_attachments_from_messages(messages: list) -> list:
+    """Extract attachment information from session messages."""
+    attachments = []
+    
+    for msg in messages:
+        if msg.get("type") == "devin_message":
+            content = msg.get("message", "")
+            
+            if "ATTACHMENT:" in content:
+                matches = re.findall(r'ATTACHMENT:"([^"]+)"', content)
+                
+                for url in matches:
+                    match = re.search(r'/attachments/([^/]+)/([^/]+)$', url)
+                    if match:
+                        uuid = match.group(1)
+                        name = match.group(2)
+                        attachments.append({
+                            "uuid": uuid,
+                            "name": name
+                        })
+    
+    return attachments
+
+
+def extract_json_from_session(result: dict, name_filter: str = None, return_single: bool = True) -> dict | list:
+    """Extract and download JSON files from Devin session result."""
+    if "error" in result:
+        return {"error": result["error"]}
+    
+    attachments = []
+    if "messages" in result:
+        attachments = extract_attachments_from_messages(result["messages"])
+    
+    downloaded_files = []
+    
+    for attachment in attachments:
+        name = attachment.get("name", "")
+        uuid = attachment.get("uuid", "")
+        
+        if name_filter and not name.startswith(name_filter):
+            continue
+        
+        if not name.lower().endswith('.json'):
+            continue
+            
+        try:
+            data = download_attachment(uuid, name)
+            
+            if return_single:
+                return data
+            else:
+                downloaded_files.append({
+                    "name": name,
+                    "data": data,
+                    "uuid": uuid
+                })
+        except Exception:
+            continue
+    
+    if return_single and not downloaded_files:
+        raise ValueError(f"No JSON files found matching filter: {name_filter}")
+    
+    return downloaded_files
+
+
 def wait_for_execution_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
     """Wait for execution session to complete, stopping early if PR is detected."""
     def pr_check(session_data):
-        from utils.utils import extract_pr_url_from_session
         if extract_pr_url_from_session(session_data):
-            print(f"✅ PR detected - stopping early")
             return True
         return False
     
