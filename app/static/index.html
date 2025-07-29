@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Issues Agent - AI-Powered Issue Resolution</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e6e6e6;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 40px 0;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 16px;
+            margin: 0 auto 20px;
+            display: block;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #a0a0a0;
+            font-weight: 300;
+        }
+
+        .repo-input-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #e6e6e6;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-group input::placeholder {
+            color: #888;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-play {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-play:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+        }
+
+        .btn-play:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e6e6e6;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(74, 222, 128, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(248, 113, 113, 0.3);
+        }
+
+        .issues-section {
+            display: none;
+        }
+
+        .issues-list {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .issue-row {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .issue-row:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .issue-row.analyzing {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .issue-info {
+            flex: 1;
+            margin-right: 20px;
+        }
+
+        .issue-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 8px;
+        }
+
+        .issue-number {
+            font-size: 0.9rem;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .issue-state {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .issue-state.open {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+        }
+
+        .issue-state.closed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .issue-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+
+        .issue-body {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .issue-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .analysis-section {
+            display: none;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .analysis-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .analysis-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+
+        .feasibility-score {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .score-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            position: relative;
+        }
+
+        .score-circle::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, #667eea 0deg, #667eea var(--score-deg), rgba(255, 255, 255, 0.1) var(--score-deg));
+        }
+
+        .score-text {
+            position: relative;
+            z-index: 1;
+        }
+
+        .score-high {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+
+        .score-medium {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+
+        .score-low {
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+        }
+
+        .plan-steps {
+            list-style: none;
+        }
+
+        .plan-step {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .plan-step-number {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .plan-step-description {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 40px;
+            color: #a0a0a0;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            color: #f87171;
+            margin: 20px 0;
+        }
+
+        .success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #4ade80;
+            margin: 20px 0;
+        }
+
+        .execution-section {
+            display: none;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .pr-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .pr-link:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .issue-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            
+            .issue-actions {
+                align-self: flex-end;
+            }
+            
+            .analysis-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="/static/cognition.jpeg" alt="Logo" class="logo">
+            <h1>GitHub Issues Agent</h1>
+            <p>AI-Powered Issue Resolution with Devin</p>
+        </div>
+
+        <div class="repo-input-section">
+            <div class="input-group">
+                <input type="text" id="repoUrl" placeholder="Enter GitHub repository URL (e.g., https://github.com/username/repo)" />
+                <button class="btn btn-primary" onclick="fetchIssues()">
+                    <span>🔍</span>
+                    Fetch Issues
+                </button>
+            </div>
+        </div>
+
+        <div class="issues-section" id="issuesSection">
+            <h2>Repository Issues</h2>
+            <div class="issues-list" id="issuesList"></div>
+        </div>
+
+        <div class="analysis-section" id="analysisSection">
+            <h2>Analysis Results</h2>
+            <div class="loading" id="analysisLoading">
+                <div class="spinner"></div>
+                <span>Analyzing issue with AI agents...</span>
+            </div>
+            <div class="analysis-grid" id="analysisGrid" style="display: none;">
+                <div class="analysis-card">
+                    <h3>📊 Feasibility Analysis</h3>
+                    <div id="feasibilityContent"></div>
+                </div>
+                <div class="analysis-card">
+                    <h3>📋 Implementation Plan</h3>
+                    <div id="planContent"></div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+                <button class="btn btn-success" onclick="executeChanges()" id="executeBtn" style="display: none;">
+                    <span>🚀</span>
+                    Execute & Push Changes
+                </button>
+            </div>
+        </div>
+
+        <div class="execution-section" id="executionSection">
+            <h2>Execution Results</h2>
+            <div class="loading" id="executionLoading">
+                <div class="spinner"></div>
+                <span>Executing changes and pushing to repository...</span>
+            </div>
+            <div id="executionResult" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentRepoUrl = '';
+        let currentIssueId = null;
+        let issues = [];
+
+        async function fetchIssues() {
+            const repoUrl = document.getElementById('repoUrl').value.trim();
+            if (!repoUrl) {
+                alert('Please enter a repository URL');
+                return;
+            }
+
+            currentRepoUrl = repoUrl;
+            
+            try {
+                const response = await fetch('/api/fetch-issues', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ repo_url: repoUrl })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch issues');
+                }
+
+                const data = await response.json();
+                issues = data.issues;
+                displayIssues(issues);
+            } catch (error) {
+                showError('Failed to fetch issues: ' + error.message);
+            }
+        }
+
+        function displayIssues(issues) {
+            const issuesList = document.getElementById('issuesList');
+            issuesList.innerHTML = '';
+
+            issues.forEach(issue => {
+                const issueRow = document.createElement('div');
+                issueRow.className = 'issue-row';
+                issueRow.id = `issue-${issue.id}`;
+
+                issueRow.innerHTML = `
+                    <div class="issue-info">
+                        <div class="issue-header">
+                            <span class="issue-number">#${issue.id}</span>
+                            <span class="issue-state ${issue.state}">${issue.state}</span>
+                        </div>
+                        <div class="issue-title">${issue.title}</div>
+                        <div class="issue-body">${issue.body || 'No description available'}</div>
+                    </div>
+                    <div class="issue-actions">
+                        <button class="btn-play" onclick="analyzeIssue('${issue.id}')" id="play-${issue.id}">
+                            <span>▶️</span>
+                            Analyze
+                        </button>
+                    </div>
+                `;
+
+                issuesList.appendChild(issueRow);
+            });
+
+            document.getElementById('issuesSection').style.display = 'block';
+        }
+
+        async function analyzeIssue(issueId) {
+            currentIssueId = issueId;
+            
+            // Update UI to show analyzing state
+            const issueRow = document.getElementById(`issue-${issueId}`);
+            const playButton = document.getElementById(`play-${issueId}`);
+            
+            issueRow.classList.add('analyzing');
+            playButton.disabled = true;
+            playButton.innerHTML = '<span>⏳</span> Analyzing...';
+
+            // Show analysis section
+            document.getElementById('analysisSection').style.display = 'block';
+            document.getElementById('analysisGrid').style.display = 'none';
+            document.getElementById('analysisLoading').style.display = 'flex';
+            document.getElementById('executeBtn').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/analyze-issue', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        repo_url: currentRepoUrl, 
+                        issue_id: issueId 
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to analyze issue');
+                }
+
+                const data = await response.json();
+                
+                if (data.status === 'completed') {
+                    displayAnalysisResults(data.analysis, data.plan);
+                    resetIssueState(issueId);
+                } else {
+                    throw new Error('Analysis failed');
+                }
+            } catch (error) {
+                showError('Failed to analyze issue: ' + error.message);
+                resetIssueState(issueId);
+            }
+        }
+
+        function resetIssueState(issueId) {
+            const issueRow = document.getElementById(`issue-${issueId}`);
+            const playButton = document.getElementById(`play-${issueId}`);
+            
+            issueRow.classList.remove('analyzing');
+            playButton.disabled = false;
+            playButton.innerHTML = '<span>▶️</span> Analyze';
+        }
+
+
+
+        function displayAnalysisResults(analysis, plan) {
+            document.getElementById('analysisLoading').style.display = 'none';
+            document.getElementById('analysisGrid').style.display = 'grid';
+
+            // Display feasibility analysis
+            const feasibilityContent = document.getElementById('feasibilityContent');
+            const score = analysis?.feasibility_score || 0;
+            const scoreClass = score >= 70 ? 'score-high' : score >= 40 ? 'score-medium' : 'score-low';
+            const scoreDeg = (score / 100) * 360;
+
+            feasibilityContent.innerHTML = `
+                <div class="feasibility-score">
+                    <div class="score-circle ${scoreClass}" style="--score-deg: ${scoreDeg}deg">
+                        <div class="score-text">${score}/100</div>
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 5px;">Feasibility Score</div>
+                        <div style="color: #a0a0a0; font-size: 0.9rem;">
+                            ${score >= 70 ? 'High feasibility' : score >= 40 ? 'Medium feasibility' : 'Low feasibility'}
+                        </div>
+                    </div>
+                </div>
+                ${analysis?.risks ? `
+                    <div style="margin-top: 20px;">
+                        <div style="font-weight: 600; margin-bottom: 10px; color: #f87171;">⚠️ Risks:</div>
+                        <ul style="color: #a0a0a0; font-size: 0.9rem;">
+                            ${analysis.risks.map(risk => `<li>${risk}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            `;
+
+            // Display implementation plan
+            const planContent = document.getElementById('planContent');
+            planContent.innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <div style="font-weight: 600; margin-bottom: 5px;">Summary</div>
+                    <div style="color: #a0a0a0; font-size: 0.9rem;">${plan?.summary || 'No summary available'}</div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <div style="font-weight: 600; margin-bottom: 5px;">Estimated Effort</div>
+                    <div style="color: #a0a0a0; font-size: 0.9rem;">${plan?.estimated_effort || 'Unknown'}</div>
+                </div>
+                ${plan?.action_plan ? `
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 10px;">Action Plan</div>
+                        <ul class="plan-steps">
+                            ${plan.action_plan.map(step => `
+                                <li class="plan-step">
+                                    <div class="plan-step-number">Step ${step.step}</div>
+                                    <div class="plan-step-description">${step.description}</div>
+                                    ${step.files ? `<div style="color: #667eea; font-size: 0.8rem; margin-top: 5px;">Files: ${step.files.join(', ')}</div>` : ''}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            `;
+
+            document.getElementById('executeBtn').style.display = 'inline-flex';
+        }
+
+        async function executeChanges() {
+            document.getElementById('executionSection').style.display = 'block';
+            document.getElementById('executionResult').style.display = 'none';
+            document.getElementById('executionLoading').style.display = 'flex';
+
+            try {
+                const response = await fetch('/api/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        repo_url: currentRepoUrl, 
+                        issue_id: currentIssueId 
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to execute changes');
+                }
+
+                const data = await response.json();
+                
+                if (data.status === 'completed') {
+                    displayExecutionResults(data.result);
+                } else {
+                    throw new Error('Execution failed');
+                }
+            } catch (error) {
+                showError('Failed to execute changes: ' + error.message);
+            }
+        }
+
+        function displayExecutionResults(result) {
+            document.getElementById('executionLoading').style.display = 'none';
+            const executionResult = document.getElementById('executionResult');
+            executionResult.style.display = 'block';
+
+            if (result?.status === 'success') {
+                executionResult.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Changes pushed successfully!</h3>
+                        ${result.pr_url ? `
+                            <p>Pull Request created:</p>
+                            <a href="${result.pr_url}" target="_blank" class="pr-link">
+                                <span>🔗</span>
+                                View Pull Request
+                            </a>
+                        ` : '<p>PR URL not found in session messages</p>'}
+                    </div>
+                `;
+            } else if (result?.session_result?.error === 'api_errors') {
+                executionResult.innerHTML = `
+                    <div class="success">
+                        <h3>⚠️ API connection issues detected</h3>
+                        <p>Session ID: ${result.session_result.session_id}</p>
+                        <p>The session might still be running on the Devin frontend. Check the frontend to see if the execution completed successfully.</p>
+                    </div>
+                `;
+            } else {
+                executionResult.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Push failed</h3>
+                        <p>${result?.reason || 'Unknown error'}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+            
+            // Insert at the top of the container
+            const container = document.querySelector('.container');
+            container.insertBefore(errorDiv, container.firstChild);
+            
+            // Remove after 5 seconds
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        // Allow Enter key to submit repo URL
+        document.getElementById('repoUrl').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchIssues();
+            }
+        });
+    </script>
+</body>
+</html> 

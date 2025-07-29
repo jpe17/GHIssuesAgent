@@ -26,7 +26,7 @@ async def startup_event():
     global devin_session
     try:
         # Try to import Devin config
-        from api.config import DEVIN_API_KEY
+        from utils.config import DEVIN_API_KEY
         if DEVIN_API_KEY:
             devin_session = aiohttp.ClientSession(
                 headers={"Authorization": f"Bearer {DEVIN_API_KEY}"}
