@@ -19,22 +19,18 @@ def get_issue_file_path(cache_dir: str, repo_url: str, issue_id: int) -> str:
     return os.path.join(cache_dir, "issues", repo_key, f"issue_{issue_id}.json")
 
 
-def download_attachment(uuid: str, name: str) -> Optional[str]:
-    """Download an attachment from Devin."""
-    download_url = f"{DEVIN_API_BASE}/attachments/{uuid}/{name}"
-    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
+def download_json_attachments(message_attachments: List[Dict], name_filter: str = None) -> List[Dict]:
+    """Download JSON files from message attachments and return list of file info.
     
-    try:
-        response = requests.get(download_url, headers=headers, allow_redirects=True)
-        response.raise_for_status()
-        content = response.content
-        return content.decode('utf-8')
-    except requests.exceptions.RequestException:
-        return None
-
-
-def download_json_attachments(message_attachments: List[Dict], name_filter: str = None) -> Optional[Dict]:
-    """Download JSON files from message attachments and return parsed data."""
+    Args:
+        message_attachments: List of attachment dictionaries
+        name_filter: Optional prefix filter for attachment names
+    
+    Returns:
+        List[Dict] of file info with name, data, uuid. Empty list if no files found.
+    """
+    
+    downloaded_files = []
     
     for attachment in message_attachments:
         name = attachment.get("name", "")
@@ -43,13 +39,37 @@ def download_json_attachments(message_attachments: List[Dict], name_filter: str 
         if not name.lower().endswith('.json'):
             continue
             
-        content = download_attachment(attachment["uuid"], name)
-        if content:
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                continue
+        # Download attachment content
+        download_url = f"{DEVIN_API_BASE}/attachments/{attachment['uuid']}/{name}"
+        headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
+        
+        try:
+            response = requests.get(download_url, headers=headers, allow_redirects=True)
+            response.raise_for_status()
+            content = response.content.decode('utf-8')
+            data = json.loads(content)
+            
+            downloaded_files.append({
+                "name": name,
+                "data": data,
+                "uuid": attachment.get("uuid")
+            })
+                
+        except (requests.exceptions.RequestException, json.JSONDecodeError):
+            continue
     
+    return downloaded_files
+
+
+def _parse_attachment_url(url: str) -> Optional[Dict]:
+    """Parse attachment URL and return uuid, filename, and url."""
+    match = re.search(r'/attachments/([^/]+)/([^/]+)$', url)
+    if match:
+        return {
+            "uuid": match.group(1),
+            "name": match.group(2),
+            "url": url
+        }
     return None
 
 
@@ -63,15 +83,9 @@ def extract_attachment_urls_from_messages(messages: List[Dict]) -> List[Dict]:
             if "ATTACHMENT:" in content:
                 matches = re.findall(r'ATTACHMENT:"([^"]+)"', content)
                 for url in matches:
-                    match = re.search(r'/attachments/([^/]+)/([^/]+)$', url)
-                    if match:
-                        uuid = match.group(1)
-                        filename = match.group(2)
-                        attachments.append({
-                            "uuid": uuid,
-                            "name": filename,
-                            "url": url
-                        })
+                    attachment = _parse_attachment_url(url)
+                    if attachment:
+                        attachments.append(attachment)
     
     return attachments
 
@@ -93,48 +107,32 @@ def extract_attachments_from_session_data(session_data: Dict) -> List[Dict]:
     structured_output = session_data.get("structured_output", {})
     if structured_output and "attachments" in structured_output:
         for url in structured_output["attachments"]:
-            match = re.search(r'/attachments/([^/]+)/([^/]+)$', url)
-            if match:
-                uuid = match.group(1)
-                filename = match.group(2)
-                if uuid not in seen_uuids:
-                    attachments.append({
-                        "uuid": uuid,
-                        "name": filename,
-                        "url": url
-                    })
-                    seen_uuids.add(uuid)
+            attachment = _parse_attachment_url(url)
+            if attachment and attachment["uuid"] not in seen_uuids:
+                attachments.append(attachment)
+                seen_uuids.add(attachment["uuid"])
     
     return attachments
 
 
-def extract_json_from_attachments(attachments: List[Dict]) -> Optional[Dict]:
-    """Extract JSON data from Devin session attachments."""
-    for attachment in attachments:
-        uuid = attachment.get("uuid")
-        name = attachment.get("name")
-        
-        if not uuid or not name or not name.lower().endswith('.json'):
-            continue
-            
-        content = download_attachment(uuid, name)
-        if content:
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                continue
+
+
+
+
+
+
+def extract_pr_url_from_session(session_result: Dict) -> Optional[str]:
+    """Extract pull request URL from session messages."""
+    messages = session_result.get("messages", [])
     
-    return None
-
-
-def extract_json_from_message_content(content: str) -> Optional[Dict]:
-    """Extract JSON data from message content using regex."""
-    try:
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group())
-    except (json.JSONDecodeError, AttributeError):
-        pass
+    for message in messages:
+        if message.get("type") == "devin_message":
+            content = message.get("message", "")
+            # Look for PR URL pattern
+            pr_match = re.search(r'https://github\.com/[^/]+/[^/]+/pull/\d+', content)
+            if pr_match:
+                return pr_match.group(0)
+    
     return None
 
 

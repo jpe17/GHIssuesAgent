@@ -36,24 +36,6 @@ def get_session_details(session_id: str) -> dict:
         return {}
 
 
-def display_session_status(session_id: str) -> str:
-    """Display current session status and return the status."""
-    session_data = get_session_details(session_id)
-    status = session_data.get("status_enum", "unknown")
-    status_emoji = {
-        "working": "🔄",
-        "blocked": "⏸️",
-        "completed": "✅",
-        "failed": "❌",
-        "stopped": "⏹️",
-        "expired": "⏰",
-        "finished": "✅"
-    }
-    emoji = status_emoji.get(status, "❓")
-    print(f"{emoji} Session Status: {status}")
-    return status
-
-
 def display_live_messages(session_id: str, last_message_count: int = 0) -> int:
     """Display new messages from a Devin session and return the new message count."""
     session_data = get_session_details(session_id)
@@ -98,7 +80,8 @@ def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: 
     """Wait for session to complete and return result."""
     start_time = time.time()
     last_message_count = 0
-    last_status = None
+    consecutive_errors = 0
+    max_consecutive_errors = 3
     
     while True:
         if time.time() - start_time > timeout:
@@ -107,11 +90,7 @@ def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: 
         try:
             session_data = get_session_details(session_id)
             status = session_data.get("status_enum")
-            
-            # Show status changes
-            if status != last_status and show_live:
-                display_session_status(session_id)
-                last_status = status
+            consecutive_errors = 0  # Reset error counter on success
             
             # Display live messages if requested
             if show_live:
@@ -123,7 +102,18 @@ def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: 
                 if attachments:
                     session_data["message_attachments"] = attachments
                 return session_data
+                
         except requests.exceptions.RequestException as e:
-            print(f"Error checking session status: {e}")
+            consecutive_errors += 1
+            print(f"Error checking session status (attempt {consecutive_errors}): {e}")
+            
+            # If we get too many consecutive errors, the session might be stuck
+            if consecutive_errors >= max_consecutive_errors:
+                print(f"⚠️  Too many consecutive errors ({consecutive_errors}). Session might still be running on frontend.")
+                print(f"   Session ID: {session_id}")
+                print(f"   You can check the session status manually on the Devin frontend.")
+                return {"error": "api_errors", "session_id": session_id}
         
-        time.sleep(5)
+        # Increase sleep time on errors to reduce API pressure
+        sleep_time = 10 if consecutive_errors > 0 else 5
+        time.sleep(sleep_time)

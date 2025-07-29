@@ -4,6 +4,7 @@ import json
 from typing import Dict
 from core.session_manager import create_devin_session, wait_for_session_completion
 from utils.config import FULL_ANALYSIS_TIMEOUT
+from utils.utils import extract_pr_url_from_session
 
 
 class ExecutorAgent:
@@ -30,7 +31,10 @@ class ExecutorAgent:
         3. Commit the changes with a descriptive message
         4. Push the branch to GitHub
         5. Create a pull request
-        6. Report completion
+        6. Report completion with the PR URL
+        
+        IMPORTANT: When you create the pull request, include the PR URL in your final message.
+        Format: "PR is ready for review: https://github.com/owner/repo/pull/X"
         
         Start implementing immediately - the plan has been pre-approved.
         """
@@ -39,8 +43,12 @@ class ExecutorAgent:
         execution_session_id = create_devin_session(execution_prompt, repo_url)
         result = wait_for_session_completion(execution_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
         
+        # Extract PR URL from the session messages
+        pr_url = extract_pr_url_from_session(result)
+        
         # Return success status based on session completion
         return {
             "status": "success" if result.get("status_enum") == "completed" else "failed",
-            "session_result": result
+            "session_result": result,
+            "pr_url": pr_url
         } 

@@ -120,7 +120,7 @@ def run_agents_on_issue(repo_url, issue_id):
     agent2_completed = False
     agent3_completed = False
     
-    # Wait for both agents, but always show feasibility first
+    # Wait for both agents to complete
     while not (agent2_completed and agent3_completed):
         try:
             agent_type, result, error = result_queue.get(timeout=1)
@@ -146,33 +146,28 @@ def run_agents_on_issue(repo_url, issue_id):
                 print("❌ Agent 3 failed")
                 return
     
-    # Always show feasibility first, then ask to continue
-    print(f"📊 Feasibility: {analysis.get('feasibility_score', 0)}/100")
+    # Show both results together
+    print(f"\n📊 Feasibility Analysis:")
+    print(f"   Score: {analysis.get('feasibility_score', 0)}/100")
     if analysis.get('feasibility_score', 0) < 50:
-        print("⚠️  Low feasibility score")
+        print("   ⚠️  Low feasibility score")
     
-    choice = input("Continue with planning? (y/n): ").strip().lower()
-    if choice != 'y':
-        return
+    print(f"\n📋 Implementation Plan:")
+    print(f"   Summary: {plan.get('summary', 'No summary available')}")
+    print(f"   Estimated Effort: {plan.get('estimated_effort', 'Unknown')}")
     
-    # Show plan and ask for final approval
-    if plan:
-        print(f"\n📋 Plan Summary: {plan.get('summary', 'No summary available')}")
-        print(f"📈 Estimated Effort: {plan.get('estimated_effort', 'Unknown')}")
-        
-        if plan.get('risks'):
-            print(f"⚠️  Risks: {', '.join(plan.get('risks', []))}")
-        
-        if plan.get('action_plan'):
-            print("\n📝 Action Plan:")
-            for step in plan.get('action_plan', []):
-                print(f"  Step {step.get('step', '?')}: {step.get('description', 'No description')}")
-                if step.get('files'):
-                    print(f"    Files: {', '.join(step.get('files', []))}")
-        
-        print("\n" + "="*80)
+    if plan.get('risks'):
+        print(f"   ⚠️  Risks: {', '.join(plan.get('risks', []))}")
     
-    print("\n🚀 Execute and push changes?")
+    if plan.get('action_plan'):
+        print(f"   📝 Action Plan:")
+        for step in plan.get('action_plan', []):
+            print(f"     Step {step.get('step', '?')}: {step.get('description', 'No description')}")
+            if step.get('files'):
+                print(f"       Files: {', '.join(step.get('files', []))}")
+    
+    print("\n" + "="*80)
+    print("🚀 Execute and push changes?")
     print("1. Yes, execute and push")
     print("2. Cancel")
     
@@ -185,15 +180,27 @@ def run_agents_on_issue(repo_url, issue_id):
             push_result = agent4.execute_and_push(plan, repo_url)
             if push_result.get("status") == "success":
                 print(f"✅ Pushed successfully!")
+                pr_url = push_result.get("pr_url")
+                if pr_url:
+                    print(f"🔗 Pull Request: {pr_url}")
+                else:
+                    print("ℹ️  PR URL not found in session messages")
             else:
-                print(f"❌ Push failed: {push_result.get('reason', 'Unknown')}")
+                session_result = push_result.get("session_result", {})
+                if session_result.get("error") == "api_errors":
+                    print(f"⚠️  API connection issues detected")
+                    print(f"   Session ID: {session_result.get('session_id')}")
+                    print(f"   The session might still be running on the Devin frontend.")
+                    print(f"   Check the frontend to see if the execution completed successfully.")
+                else:
+                    print(f"❌ Push failed: {push_result.get('reason', 'Unknown')}")
             break
         elif choice == "2":
-            if agent3._current_session_id:
-                cancel_session(agent3._current_session_id)
             return
         else:
             print("❌ Please enter 1 or 2")
+    
+
 
 
 def main():

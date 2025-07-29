@@ -4,7 +4,7 @@ import json
 import os
 from typing import List, Dict
 from core.session_manager import create_devin_session, wait_for_session_completion
-from utils.utils import extract_json_from_attachments, get_cache_key, download_json_attachments
+from utils.utils import get_cache_key, download_json_attachments
 from utils.config import ISSUES_FETCH_TIMEOUT
 
 
