@@ -144,11 +144,15 @@ def download_attachment(uuid: str, name: str) -> dict:
     url = f"{DEVIN_API_BASE}/attachments/{uuid}/{name}"
     headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
     
-    response = requests.get(url, headers=headers, allow_redirects=True)
-    response.raise_for_status()
-    
-    content = response.content
-    return json.loads(content)
+    try:
+        response = requests.get(url, headers=headers, allow_redirects=True)
+        response.raise_for_status()
+        
+        content = response.content
+        return json.loads(content)
+    except Exception as e:
+        print(f"❌ Error downloading attachment {name}: {str(e)}")
+        raise
 
 
 def extract_attachments_from_messages(messages: list) -> list:

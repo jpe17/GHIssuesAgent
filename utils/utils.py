@@ -22,21 +22,41 @@ def check_cache(cache_file: str) -> Optional[Dict]:
     if os.getenv('VERCEL') == '1':
         return None
     
-    if os.path.exists(cache_file):
-        with open(cache_file, 'r') as f:
-            return json.load(f)
+    try:
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r') as f:
+                return json.load(f)
+    except (OSError, IOError):
+        # Handle read-only filesystem errors gracefully
+        return None
     return None
 
 
 def save_to_cache(cache_file: str, data: Dict) -> None:
     """Save data to cache file."""
-    # Skip caching in Vercel environment
+    # Skip caching in Vercel environment or if filesystem is read-only
     if os.getenv('VERCEL') == '1':
         return
     
-    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-    with open(cache_file, 'w') as f:
-        json.dump(data, f, indent=2)
+    try:
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        with open(cache_file, 'w') as f:
+            json.dump(data, f, indent=2)
+    except (OSError, IOError):
+        # Handle read-only filesystem errors gracefully
+        print(f"⚠️  Could not save to cache (read-only filesystem): {cache_file}")
+        return
+
+
+def safe_makedirs(path: str) -> bool:
+    """Safely create directories, handling read-only filesystem."""
+    try:
+        os.makedirs(path, exist_ok=True)
+        return True
+    except (OSError, IOError):
+        # Handle read-only filesystem errors gracefully
+        print(f"⚠️  Could not create directory (read-only filesystem): {path}")
+        return False
 
 
 def prepare_issue_data(issue: Dict) -> Dict:
