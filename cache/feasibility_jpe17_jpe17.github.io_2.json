@@ -1,0 +1,50 @@
+{
+  "feasibility_score": 95,
+  "complexity_score": 25,
+  "scope_assessment": {
+    "size": "Small",
+    "impact": "Module-wide"
+  },
+  "technical_analysis": {
+    "estimated_files": [
+      "static/css/main.css"
+    ],
+    "dependencies": [
+      "CSS clamp() function",
+      "CSS custom properties",
+      "Responsive design breakpoints"
+    ],
+    "risks": [
+      "Mobile font scaling variations",
+      "Different browser text rendering",
+      "Viewport width edge cases with clamp()",
+      "Potential overflow on very small screens"
+    ]
+  },
+  "confidence": 90,
+  "detailed_analysis": {
+    "root_cause": "The .hero-title has min-height: 6rem but uses clamp(2.5rem, 8vw, 5rem) for font-size. The typing animation cycles through phrases of varying lengths ('Engineering Lead' vs 'Machine Learning Researcher'), causing layout shifts when the text wraps to multiple lines on smaller viewports.",
+    "current_implementation": {
+      "hero_title_min_height": "6rem",
+      "font_size": "clamp(2.5rem, 8vw, 5rem)",
+      "line_height": "1.2",
+      "typing_phrases": [
+        "Machine Learning Researcher (longest)",
+        "Engineering Lead (shortest)",
+        "Co-Founder & CTO",
+        "Solution Architect",
+        "Python Developer"
+      ]
+    },
+    "solution_approach": "Increase min-height to accommodate longest phrase at all viewport sizes, or implement fixed height with overflow handling. The 6rem min-height is insufficient for multi-line text scenarios.",
+    "testing_requirements": [
+      "Test on mobile devices (320px-768px width)",
+      "Verify all typing phrases fit without overflow",
+      "Check layout stability during animation cycles",
+      "Validate accessibility with different font sizes"
+    ],
+    "implementation_strategy": "CSS-only solution using calculated min-height based on longest phrase length and responsive font scaling. No JavaScript changes required."
+  },
+  "issue_number": 2,
+  "issue_title": "Bug: Hero section moves up and down when typing animation changes text length"
+}

@@ -1,57 +1,53 @@
 {
-  "summary": "Fix skills progress bar flickering by ensuring proper initial state and animation timing. The issue occurs because progress bars don't have an explicit initial width of 0%, causing a visual glitch when the 300ms timeout triggers the width animation with a 1s CSS transition.",
+  "summary": "Fix skills progress bar flicker by removing the 300ms timeout delay and ensuring proper initial state before CSS transitions. The issue stems from progress bars not having a defined initial width (0%) before the animation begins, causing visual glitches when the CSS transition starts.",
   "action_plan": [
     {
       "step": 1,
-      "description": "Set explicit initial width of 0% for skill progress bars in CSS to prevent flickering",
+      "description": "Modify animateSkillBar function to set initial width to 0% immediately before applying the target width",
       "files": [
-        "static/css/main.css"
+        "static/js/main-static.js"
       ]
     },
     {
       "step": 2,
-      "description": "Modify renderSkills function to ensure progress bars start with 0% width when created",
+      "description": "Remove the 300ms setTimeout delay that causes the flicker and backward movement",
       "files": [
         "static/js/main-static.js"
       ]
     },
     {
       "step": 3,
-      "description": "Optimize animateSkillBar function timing to reduce the 300ms delay and ensure smooth animation",
-      "files": [
-        "static/js/main-static.js"
-      ]
-    },
-    {
-      "step": 4,
-      "description": "Add CSS class for initial state management to prevent layout shifts during animation",
+      "description": "Add CSS rule to ensure skill-progress elements start with width: 0% by default",
       "files": [
         "static/css/main.css"
       ]
     },
     {
-      "step": 5,
-      "description": "Test the fix locally by serving the website and scrolling to skills section",
+      "step": 4,
+      "description": "Test the animation by scrolling to skills section and verifying smooth progress bar animations",
       "files": [
         "index.html"
       ]
     },
     {
-      "step": 6,
-      "description": "Verify animation works smoothly across different browsers and screen sizes",
-      "files": []
+      "step": 5,
+      "description": "Verify animations work correctly across different browsers and screen sizes",
+      "files": [
+        "static/js/main-static.js",
+        "static/css/main.css"
+      ]
     }
   ],
   "estimated_effort": "Small",
   "risks": [
-    "Animation timing changes might affect other scroll-triggered animations",
-    "CSS changes could impact mobile responsiveness of skill bars",
-    "Browser compatibility issues with CSS transitions"
+    "Animation timing might need fine-tuning if removing the timeout affects other visual elements",
+    "CSS specificity issues if the new width: 0% rule conflicts with existing styles",
+    "Potential performance impact if multiple skill bars animate simultaneously without the staggered delay"
   ],
   "dependencies": [
-    "IntersectionObserver API for scroll-triggered animations",
-    "CSS transition support in target browsers",
-    "Local development server for testing (python -m http.server or npx serve)"
+    "IntersectionObserver API support (already implemented)",
+    "CSS transition support (already implemented)",
+    "No external library dependencies required"
   ],
   "issue_number": 1,
   "issue_title": "Bug: Skills progress bars flicker and move backwards during animation"

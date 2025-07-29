@@ -43,6 +43,13 @@ class FeasibilityAnalyzerAgent:
         • Identify scope, files, risks, dependencies
         • Save as "analysis.json" attachment
 
+        RESTRICTIONS:
+        • DO NOT write, modify, or create any code files
+        • DO NOT execute any commands or scripts
+        • DO NOT make any changes to the repository
+        • ONLY analyze and create assessment document
+        • Focus on analysis, not implementation
+
         OUTPUT FORMAT:
         JSON with keys:
         {{

@@ -41,7 +41,13 @@ class PlanAgent:
         • Create step-by-step implementation plan
         • Identify files to modify and estimate effort
         • Save as "plan.json" attachment
-        • DO NOT implement code - only plan
+
+        RESTRICTIONS:
+        • DO NOT write, modify, or create any code files
+        • DO NOT execute any commands or scripts
+        • DO NOT make any changes to the repository
+        • ONLY analyze and create a plan document
+        • Focus on planning, not implementation
 
         OUTPUT FORMAT:
         {{
