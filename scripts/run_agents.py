@@ -181,6 +181,7 @@ def run_agents_on_issue(repo_url, issue_id):
             if push_result.get("status") == "success":
                 print(f"✅ Pushed successfully!")
                 pr_url = push_result.get("pr_url")
+                
                 if pr_url:
                     print(f"🔗 Pull Request: {pr_url}")
                 else:

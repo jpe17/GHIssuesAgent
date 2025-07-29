@@ -17,5 +17,6 @@ if not DEVIN_API_KEY:
 # Timeout configurations
 SCAN_TIMEOUT = 300  # 5 minutes for repository scanning (deprecated)
 TARGETED_ANALYSIS_TIMEOUT = 600  # 10 minutes for targeted analysis (deprecated)
-FULL_ANALYSIS_TIMEOUT = 600  # 10 minutes for full repository analysis (reduced from 15)
+FULL_ANALYSIS_TIMEOUT = 600  # 10 minutes for full repository analysis
+EXECUTION_TIMEOUT = 1800  # 30 minutes for execution and pushing (much longer for complex tasks)
 ISSUES_FETCH_TIMEOUT = 120  # 2 minutes for fetching issues (should be much faster) 

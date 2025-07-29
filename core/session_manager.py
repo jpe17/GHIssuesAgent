@@ -76,44 +76,47 @@ def send_session_message(session_id: str, message: str) -> bool:
         return False
 
 
-def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
-    """Wait for session to complete and return result."""
+def _wait_for_session_with_custom_check(session_id: str, timeout: int, show_live: bool, custom_check=None) -> dict:
+    """Helper function to wait for session completion with optional custom check."""
     start_time = time.time()
     last_message_count = 0
-    consecutive_errors = 0
-    max_consecutive_errors = 3
     
-    while True:
-        if time.time() - start_time > timeout:
-            return {"error": "timeout"}
-        
+    while time.time() - start_time < timeout:
         try:
             session_data = get_session_details(session_id)
-            status = session_data.get("status_enum")
-            consecutive_errors = 0  # Reset error counter on success
             
-            # Display live messages if requested
+            # Show live messages
             if show_live:
                 last_message_count = display_live_messages(session_id, last_message_count)
             
-            if status in ["completed", "failed", "stopped", "blocked"]:
-                # Extract attachments from session data
-                attachments = extract_attachments_from_session_data(session_data)
-                if attachments:
-                    session_data["message_attachments"] = attachments
+            # Run custom check if provided
+            if custom_check and custom_check(session_data):
+                return session_data
+            
+            # Check if session is done
+            if session_data.get("status_enum") in ["completed", "failed", "stopped", "blocked"]:
                 return session_data
                 
-        except requests.exceptions.RequestException as e:
-            consecutive_errors += 1
-            print(f"Error checking session status (attempt {consecutive_errors}): {e}")
-            
-            # If we get too many consecutive errors, the session might be stuck
-            if consecutive_errors >= max_consecutive_errors:
-                print(f"⚠️  Too many consecutive errors ({consecutive_errors}). Session might still be running on frontend.")
-                print(f"   Session ID: {session_id}")
-                print(f"   You can check the session status manually on the Devin frontend.")
-                return {"error": "api_errors", "session_id": session_id}
+        except requests.exceptions.RequestException:
+            print("⚠️  API error, retrying...")
         
-        # Increase sleep time on errors to reduce API pressure
-        sleep_time = 10 if consecutive_errors > 0 else 5
-        time.sleep(sleep_time)
+        time.sleep(30)
+    
+    return {"error": "timeout"}
+
+
+def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
+    """Wait for session to complete and return result."""
+    return _wait_for_session_with_custom_check(session_id, timeout, show_live)
+
+
+def wait_for_execution_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
+    """Wait for execution session to complete, stopping early if PR is detected."""
+    def pr_check(session_data):
+        from utils.utils import extract_pr_url_from_session
+        if extract_pr_url_from_session(session_data):
+            print(f"✅ PR detected - stopping early")
+            return True
+        return False
+    
+    return _wait_for_session_with_custom_check(session_id, timeout, show_live, pr_check)

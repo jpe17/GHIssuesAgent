@@ -115,12 +115,6 @@ def extract_attachments_from_session_data(session_data: Dict) -> List[Dict]:
     return attachments
 
 
-
-
-
-
-
-
 def extract_pr_url_from_session(session_result: Dict) -> Optional[str]:
     """Extract pull request URL from session messages."""
     messages = session_result.get("messages", [])
