@@ -149,8 +149,10 @@ const App = {
 
         // Show execution section with coffee message
         document.getElementById('executionSection').style.display = 'block';
-        document.getElementById('executionLoading').style.display = 'block';
         document.getElementById('executionResult').style.display = 'none';
+        
+        // Start progress animation
+        this.startExecutionProgress();
         
         // Scroll to execution section
         document.getElementById('executionSection').scrollIntoView({ behavior: 'smooth' });
@@ -172,21 +174,32 @@ const App = {
 
             const data = await response.json();
             
-            // Hide loading and show results
-            document.getElementById('executionLoading').style.display = 'none';
+            // Show results
             document.getElementById('executionResult').style.display = 'block';
             
             if (data.status === 'completed') {
-                let message = `<div style="text-align: center;">
-                    <h3 style="color: #28a745; margin-bottom: 16px;">🎉 Execution Completed!</h3>
-                    <p style="margin-bottom: 16px;">Issue #${this.state.currentIssueId} has been successfully implemented.</p>`;
+                // Only complete progress when we actually get a successful response
+                this.completeExecutionProgress();
+                
+                let message = `<div class="execution-success">
+                    <div class="success-header">
+                        <div class="success-icon">✅</div>
+                        <div class="success-content">
+                            <h3>Execution Completed</h3>
+                            <p>Issue #${this.state.currentIssueId} has been successfully implemented</p>
+                        </div>
+                    </div>`;
                 
                 if (data.pr_url) {
-                    message += `<a href="${data.pr_url}" target="_blank" class="btn btn-primary" style="margin-top: 16px;">
-                        <span>🔗</span> View Pull Request
-                    </a>`;
+                    message += `<div class="success-actions">
+                        <a href="${data.pr_url}" target="_blank" class="btn btn-primary">
+                            <span>🔗</span> View Pull Request
+                        </a>
+                    </div>`;
                 } else {
-                    message += '<p style="color: #6c757d;">Check the Devin frontend for detailed results.</p>';
+                    message += `<div class="success-actions">
+                        <p class="info-text">Check the Devin frontend for detailed results</p>
+                    </div>`;
                 }
                 message += '</div>';
                 
@@ -211,6 +224,19 @@ const App = {
     },
 
     async executeSingle(issueId) {
+        // Set current issue for execution
+        this.state.currentIssueId = issueId;
+        
+        // Show execution section with coffee message
+        document.getElementById('executionSection').style.display = 'block';
+        document.getElementById('executionResult').style.display = 'none';
+        
+        // Start progress animation
+        this.startExecutionProgress();
+        
+        // Scroll to execution section
+        document.getElementById('executionSection').scrollIntoView({ behavior: 'smooth' });
+
         const btn = document.querySelector(`[onclick="executeSingleIssue('${issueId}')"]`);
         this.setLoading(btn, 'Executing...');
 
@@ -227,20 +253,55 @@ const App = {
             if (!response.ok) throw new Error('Failed to execute changes');
 
             const data = await response.json();
+            
+            // Show results
+            document.getElementById('executionResult').style.display = 'block';
+            
             if (data.status === 'completed') {
-                btn.innerHTML = '✅ Completed';
-                let message = `Execution completed for issue #${issueId}!`;
+                // Only complete progress when we actually get a successful response
+                this.completeExecutionProgress();
+                
+                let message = `<div class="execution-success">
+                    <div class="success-header">
+                        <div class="success-icon">✅</div>
+                        <div class="success-content">
+                            <h3>Execution Completed</h3>
+                            <p>Issue #${issueId} has been successfully implemented</p>
+                        </div>
+                    </div>`;
+                
                 if (data.pr_url) {
-                    message += ` <a href="${data.pr_url}" target="_blank" style="color: #0066cc; text-decoration: underline;">View Pull Request</a>`;
+                    message += `<div class="success-actions">
+                        <a href="${data.pr_url}" target="_blank" class="btn btn-primary">
+                            <span>🔗</span> View Pull Request
+                        </a>
+                    </div>`;
                 } else {
-                    message += ' Check the Devin frontend for results.';
+                    message += `<div class="success-actions">
+                        <p class="info-text">Check the Devin frontend for detailed results</p>
+                    </div>`;
                 }
-                this.showMessage(message, 'success');
+                message += '</div>';
+                
+                document.getElementById('executionResult').innerHTML = message;
+                btn.innerHTML = '✅ Completed';
             } else {
                 throw new Error('Execution failed');
             }
         } catch (error) {
-            this.showMessage(`Failed to execute issue #${issueId}: ${error.message}`, 'error');
+            // Complete progress and show error
+            this.completeExecutionProgress();
+            document.getElementById('executionResult').style.display = 'block';
+            document.getElementById('executionResult').innerHTML = `
+                <div class="execution-error">
+                    <div class="error-header">
+                        <div class="error-icon">❌</div>
+                        <div class="error-content">
+                            <h3>Execution Failed</h3>
+                            <p>${error.message}</p>
+                        </div>
+                    </div>
+                </div>`;
             btn.innerHTML = '❌ Failed';
         } finally {
             btn.disabled = false;
@@ -650,6 +711,101 @@ const App = {
         message.innerHTML = `<strong>${type === 'error' ? 'Error' : 'Success'}:</strong> ${text}`;
         document.querySelector('.container').insertBefore(message, document.querySelector('.container').firstChild);
         setTimeout(() => message.remove(), 5000);
+    },
+
+    startExecutionProgress() {
+        const steps = document.querySelectorAll('.step');
+        const progressFill = document.querySelector('.progress-fill');
+        
+        // Reset all steps
+        steps.forEach(step => {
+            step.classList.remove('active', 'completed');
+        });
+        
+        // Start with first step active
+        steps[0].classList.add('active');
+        progressFill.style.width = '5%';
+        
+        // Realistic timing for 10-15 minute execution
+        const totalDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
+        const stepDurations = [
+            { step: 0, duration: 2 * 60 * 1000, label: 'Analyzing' },    // 2 minutes
+            { step: 1, duration: 11 * 60 * 1000, label: 'Coding' },      // 11 minutes (most time here)
+            { step: 2, duration: 1.5 * 60 * 1000, label: 'Pushing' },    // 1.5 minutes
+            { step: 3, duration: 0.5 * 60 * 1000, label: 'Complete' }    // 0.5 minutes
+        ];
+        
+        let currentStep = 0;
+        let startTime = Date.now();
+        
+        const progressInterval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const currentStepData = stepDurations[currentStep];
+            
+            // Update time display
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            const timeElapsed = document.querySelector('.time-elapsed');
+            if (timeElapsed) {
+                timeElapsed.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            if (currentStep < stepDurations.length - 1 && elapsed >= currentStepData.duration) {
+                // Move to next step
+                steps[currentStep].classList.remove('active');
+                steps[currentStep].classList.add('completed');
+                currentStep++;
+                steps[currentStep].classList.add('active');
+                
+                // Update progress bar based on completed steps
+                const completedProgress = stepDurations.slice(0, currentStep + 1)
+                    .reduce((sum, step) => sum + step.duration, 0);
+                const progressPercent = Math.min((completedProgress / totalDuration) * 100, 95);
+                progressFill.style.width = `${progressPercent}%`;
+            } else if (currentStep === stepDurations.length - 1) {
+                // Final step - wait for actual completion (don't auto-complete)
+                const progressPercent = Math.min((elapsed / totalDuration) * 100, 95);
+                progressFill.style.width = `${progressPercent}%`;
+            } else {
+                // Update progress within current step
+                const stepProgress = elapsed / currentStepData.duration;
+                const stepStartProgress = currentStep > 0 ? 
+                    stepDurations.slice(0, currentStep).reduce((sum, step) => sum + step.duration, 0) / totalDuration * 100 : 0;
+                const stepEndProgress = (stepDurations.slice(0, currentStep + 1).reduce((sum, step) => sum + step.duration, 0) / totalDuration) * 100;
+                const currentProgress = stepStartProgress + (stepEndProgress - stepStartProgress) * stepProgress;
+                progressFill.style.width = `${Math.min(currentProgress, 95)}%`;
+            }
+        }, 1000); // Update every second
+        
+        this.progressInterval = progressInterval;
+        this.progressStartTime = startTime;
+    },
+
+    completeExecutionProgress() {
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+        }
+        
+        const steps = document.querySelectorAll('.step');
+        const progressFill = document.querySelector('.progress-fill');
+        
+        // Complete all steps
+        steps.forEach(step => {
+            step.classList.remove('active');
+            step.classList.add('completed');
+        });
+        
+        // Show 100% completion
+        progressFill.style.width = '100%';
+        
+        // Update time to show completion
+        const timeElapsed = document.querySelector('.time-elapsed');
+        if (timeElapsed) {
+            const elapsed = Date.now() - this.progressStartTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            timeElapsed.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
     }
 };
 

@@ -94,13 +94,54 @@
             <div class="multiple-analysis-grid" id="multipleAnalysisGrid" style="display: none;"></div>
         </div>
 
-        <div class="execution-section card" id="executionSection" style="display: none;">
-            <h2 class="section-title">Execution Results</h2>
-            <div class="loading" id="executionLoading">
-                <div class="spinner"></div>
-                <span>🤖 Agent is working... ☕ Perfect time for a coffee break! Your issue will be solved within 15 minutes. Sit back and relax! ✨</span>
+√        <div class="execution-section card" id="executionSection" style="display: none;">
+            <div class="execution-header">
+                <div class="execution-status">
+                    <div class="status-indicator">
+                        <div class="spinner"></div>
+                    </div>
+                    <div class="status-content">
+                        <h3>AI Agent Execution</h3>
+                        <p>Processing your issue with advanced automation</p>
+                    </div>
+                </div>
+                <div class="execution-actions">
+                    <div class="coffee-break">
+                        <span class="coffee-emoji">☕</span>
+                        <span>Time for a coffee break</span>
+                    </div>
+                </div>
             </div>
-            <div id="executionResult" style="display: none; padding: 32px;"></div>
+            
+            <div class="execution-progress">
+                <div class="progress-steps">
+                    <div class="step active">
+                        <div class="step-icon">🔍</div>
+                        <div class="step-label">Analyzing</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">💻</div>
+                        <div class="step-label">Coding</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">🚀</div>
+                        <div class="step-label">Pushing</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">✅</div>
+                        <div class="step-label">Complete</div>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <div class="progress-time">
+                    <span class="time-elapsed">0:00</span>
+                    <span class="time-estimate">Est. 15 minutes</span>
+                </div>
+            </div>
+            
+            <div id="executionResult" style="display: none;"></div>
         </div>
     </div>
 
