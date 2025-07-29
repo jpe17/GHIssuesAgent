@@ -45,42 +45,36 @@ async def get_index():
 async def fetch_issues(request: RepoRequest):
     """Fetch issues from a repository."""
     try:
-        # Check if cache exists
-        repo_key = request.repo_url.replace("https://github.com/", "").replace("/", "_")
-        cache_dir = os.path.join("cache", "issues", repo_key)
+        # For Vercel deployment, always fetch fresh issues (no file system caching)
+        print(f"🔄 Fetching fresh issues for: {request.repo_url}")
         
-        if not os.path.exists(cache_dir) or len(os.listdir(cache_dir)) == 0:
-            # Fetch issues if needed
-            agent1 = IssueFetcherAgent()
-            issues = agent1.fetch_and_cache_issues(request.repo_url)
-            if not issues:
-                raise HTTPException(status_code=400, detail="Failed to fetch issues")
-        else:
-            print("✅ Using cached issues")
+        # Fetch issues directly without caching
+        agent1 = IssueFetcherAgent()
+        issues_data = agent1.fetch_and_cache_issues(request.repo_url)
         
-        # Load and return issues
+        if not issues_data:
+            raise HTTPException(status_code=400, detail="Failed to fetch issues")
+        
+        # Convert to the expected format
         issues = []
-        for filename in os.listdir(cache_dir):
-            if filename.endswith('.json'):
-                issue_id = filename.replace('.json', '').replace('issue_', '')
-                file_path = os.path.join(cache_dir, filename)
-                with open(file_path, 'r') as f:
-                    issue_data = json.load(f)
-                    issues.append({
-                        "id": str(issue_data.get('number', issue_id)),
-                        "title": issue_data.get('title', 'No title'),
-                        "state": issue_data.get('state', 'open'),
-                        "body": issue_data.get('body', ''),
-                        "created_at": issue_data.get('created_at', ''),
-                        "updated_at": issue_data.get('updated_at', '')
-                    })
+        for issue_data in issues_data:
+            issues.append({
+                "id": str(issue_data.get('number', '')),
+                "title": issue_data.get('title', 'No title'),
+                "state": issue_data.get('state', 'open'),
+                "body": issue_data.get('body', ''),
+                "created_at": issue_data.get('created_at', ''),
+                "updated_at": issue_data.get('updated_at', '')
+            })
         
         # Sort by issue number
         issues.sort(key=lambda x: int(x["id"]))
         
+        print(f"✅ Successfully fetched {len(issues)} issues")
         return {"issues": issues}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Error fetching issues: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch issues: {str(e)}")
 
 def analyze_single_issue(repo_url: str, issue_id: str) -> dict:
     """Analyze a single issue (for parallel processing)."""

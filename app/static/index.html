@@ -932,6 +932,24 @@
 
             currentRepoUrl = repoUrl;
             
+            // Show loading state
+            const fetchBtn = document.querySelector('.btn-primary');
+            const originalText = fetchBtn.innerHTML;
+            fetchBtn.disabled = true;
+            fetchBtn.innerHTML = '<div class="spinner"></div> Fetching Issues...';
+            
+            // Show loading message in issues section
+            const issuesSection = document.getElementById('issuesSection');
+            issuesSection.style.display = 'block';
+            const issuesList = document.getElementById('issuesList');
+            issuesList.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <div class="spinner" style="margin: 0 auto 16px;"></div>
+                    <h3>Fetching Repository Issues</h3>
+                    <p>Please wait while we retrieve the issues from ${repoUrl}</p>
+                </div>
+            `;
+            
             try {
                 const response = await fetch('/api/fetch-issues', {
                     method: 'POST',
@@ -946,6 +964,12 @@
                 displayIssues(issues);
             } catch (error) {
                 showError('Failed to fetch issues: ' + error.message);
+                // Hide issues section on error
+                issuesSection.style.display = 'none';
+            } finally {
+                // Restore button state
+                fetchBtn.disabled = false;
+                fetchBtn.innerHTML = originalText;
             }
         }
 

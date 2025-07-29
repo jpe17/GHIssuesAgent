@@ -80,6 +80,8 @@ class PlanAgent:
             "issue_title": issue_data.get("title"),
         })
         
+        # Cache the result
+        cache_file = get_cache_file_path(self.cache_dir, repo_url, "plan", issue_number)
         save_to_cache(cache_file, plan_data)
         print(f"Cached plan for issue #{issue_number}")
         
