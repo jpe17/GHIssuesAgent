@@ -27,10 +27,24 @@ class IssueFetcherAgent:
             return cached_issues
         
         # Fetch fresh issues if no cache
-        prompt = f"""Fetch all open issues from {repo_url}. 
-        Create one JSON file per issue named issue_1.json, issue_2.json, etc. 
-        Each file should contain: {{"number": 1, "title": "...", "body": "...", "created_at": "...", "labels": [...]}}. 
-        Save all files as attachments."""
+        prompt = f"""
+        GOAL: Fetch all open GitHub issues and save as individual JSON files.
+
+        INSTRUCTIONS:
+        • Retrieve all open issues from {repo_url}
+        • Create files: issue_1.json, issue_2.json, etc.
+        • Save all files as attachments
+
+        OUTPUT FORMAT:
+        Each JSON file should contain:
+        {{
+            "number": <issue_number>,
+            "title": "<issue_title>",
+            "body": "<issue_description>",
+            "created_at": "<creation_date>",
+            "labels": ["label1", "label2", ...]
+        }}
+        """
         
         session_id = create_devin_session(prompt, repo_url)
         result = wait_for_session_completion(session_id, timeout=ISSUES_FETCH_TIMEOUT)

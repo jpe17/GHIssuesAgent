@@ -30,33 +30,32 @@ class FeasibilityAnalyzerAgent:
         # Analyze with Devin
         issue_data = prepare_issue_data(issue)
         prompt = f"""
-        Analyze this GitHub issue for feasibility and complexity.
-        
-        Repository: {repo_url}
-        Issue Data: {issue_data}
-        
-        IMPORTANT: 
-        1. Complete the task fully - do not wait for further instructions
-        2. Mark the task as complete when done
-        3. Save the analysis as JSON attachment named "analysis.json"
-        
-        Provide a comprehensive analysis as JSON:
-        
-        1. **Feasibility Score**: 0-100 (how likely this can be implemented)
-        2. **Complexity Score**: 0-100 (how complex the implementation would be)
-        3. **Scope Assessment**: 
-           - size: Small/Medium/Large
-           - impact: Minimal/Module-wide/System-wide
-        4. **Technical Analysis**:
-           - estimated_files: List of files that might need changes
-           - dependencies: Dependencies that might be affected
-           - risks: Potential risks or challenges
-        5. **Confidence**: 0-100 based on clarity and feasibility
-        
-        Return as JSON with keys: feasibility_score, complexity_score, scope_assessment, 
-        technical_analysis, confidence
-        
-        Save the analysis as "analysis.json" attachment and mark the task as done.
+        GOAL: Analyze GitHub issue for feasibility and complexity.
+
+        INSTRUCTIONS:
+        • Evaluate implementation feasibility (0-100)
+        • Assess complexity (0-100) 
+        • Identify scope, files, risks, dependencies
+        • Save as "analysis.json" attachment
+
+        OUTPUT FORMAT:
+        JSON with keys:
+        {{
+            "feasibility_score": <0-100>,
+            "complexity_score": <0-100>,
+            "scope_assessment": {{
+                "size": "Small/Medium/Large",
+                "impact": "Minimal/Module-wide/System-wide"
+            }},
+            "technical_analysis": {{
+                "estimated_files": ["file1.py", "file2.py"],
+                "dependencies": ["dep1", "dep2"],
+                "risks": ["risk1", "risk2"]
+            }},
+            "confidence": <0-100>
+        }}
+
+        INPUT: Repository: {repo_url} | Issue: {issue_data}
         """
         
         session_id = create_devin_session(prompt, repo_url)

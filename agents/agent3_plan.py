@@ -34,26 +34,18 @@ class PlanAgent:
         # Create session with issue data in prompt
         issue_info = prepare_issue_data(issue_data)
         prompt = f"""
-        TASK: Create a plan for this GitHub issue.
-        
-        CRITICAL INSTRUCTIONS:
-        - ONLY analyze the repository and create a plan
-        - DO NOT implement any code changes
-        - DO NOT create any files
-        - DO NOT modify any existing code
-        - ONLY create the plan.json file and STOP
-        - Wait for further instructions after creating the plan
-        
-        Your task is to:
-        1. Analyze the repository structure
-        2. Understand the issue requirements
-        3. Create a detailed implementation plan
-        4. Save the plan as "plan.json" attachment
-        5. STOP and wait for user approval
-        
-        Plan format:
+        GOAL: Create implementation plan for GitHub issue.
+
+        INSTRUCTIONS:
+        • Analyze repository structure and issue requirements
+        • Create step-by-step implementation plan
+        • Identify files to modify and estimate effort
+        • Save as "plan.json" attachment
+        • DO NOT implement code - only plan
+
+        OUTPUT FORMAT:
         {{
-            "summary": "Brief overview of the implementation",
+            "summary": "Brief overview of the implementation approach",
             "action_plan": [
                 {{"step": 1, "description": "what to do", "files": ["file1.py", "file2.py"]}},
                 {{"step": 2, "description": "what to do next", "files": ["file3.py"]}}
@@ -63,11 +55,7 @@ class PlanAgent:
             "dependencies": ["dep1", "dep2"]
         }}
 
-        Save the plan as "plan.json" attachment and mark the task as done.
-        DO NOT IMPLEMENT ANY CHANGES - ONLY CREATE THE PLAN AND STOP.
-        
-        Repository: {repo_url}
-        Issue Info: {issue_info}
+        INPUT: Repository: {repo_url} | Issue: {issue_info}
         """
         
         session_id = create_devin_session(prompt, repo_url)

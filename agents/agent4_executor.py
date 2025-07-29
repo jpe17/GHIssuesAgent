@@ -17,28 +17,18 @@ class ExecutorAgent:
         print("\nAgent 4: Executing plan and pushing to GitHub...")
         
         execution_prompt = f"""
-        EXECUTE_AND_PUSH: Implement the approved plan and push to GitHub.
-        
-        CRITICAL: Work efficiently and complete all steps quickly.
-        
-        You must:
-        1. Implement all the planned changes according to the plan
-        2. Create a new branch for the changes
-        3. Commit the changes with a descriptive message
-        4. Push the branch to GitHub
-        5. Create a pull request
-        6. Report completion with PR URL
-        
-        IMPORTANT: 
-        - Focus on the core implementation, avoid unnecessary analysis
-        - Use the plan as your guide - don't overthink
-        - Work step by step without delays
-        - Include PR URL in final message: "PR is ready for review: https://github.com/owner/repo/pull/X"
-        
-        Start implementing immediately - the plan has been pre-approved.
-                
-        Repository: {repo_url}
-        Approved Plan: {plan_data}
+        GOAL: Execute approved plan and create GitHub pull request.
+
+        INSTRUCTIONS:
+        • Implement all planned changes
+        • Create new branch and commit changes
+        • Push to GitHub and create pull request
+        • Work efficiently without overthinking
+
+        OUTPUT FORMAT:
+        Final message: "PR is ready for review: https://github.com/owner/repo/pull/X"
+
+        INPUT: Repository: {repo_url} | Plan: {plan_data}
         """
         
         session_id = create_devin_session(execution_prompt, repo_url)
