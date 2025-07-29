@@ -4,255 +4,416 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitHub Issues Agent - AI-Powered Issue Resolution</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-tertiary: #1a1a1a;
+            --border-primary: rgba(255, 255, 255, 0.08);
+            --border-accent: rgba(99, 102, 241, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #a3a3a3;
+            --text-muted: #737373;
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-            color: #e6e6e6;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(1deg); }
+            66% { transform: translate(-20px, 20px) rotate(-1deg); }
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 32px 24px;
         }
 
+        /* Header */
         .header {
             text-align: center;
-            margin-bottom: 40px;
-            padding: 40px 0;
+            margin-bottom: 64px;
+            padding: 80px 0 40px;
+            position: relative;
+        }
+
+        .logo-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 32px;
         }
 
         .logo {
-            width: 80px;
-            height: 80px;
-            border-radius: 16px;
-            margin: 0 auto 20px;
-            display: block;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            width: 120px;
+            height: 120px;
+            border-radius: 24px;
+            object-fit: cover;
+            box-shadow: 
+                0 0 0 1px rgba(255, 255, 255, 0.1),
+                0 8px 32px rgba(99, 102, 241, 0.3);
+            position: relative;
+            overflow: hidden;
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        .logo::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 32px rgba(99, 102, 241, 0.3); }
+            50% { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2), 0 12px 48px rgba(99, 102, 241, 0.4); }
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
         }
 
         .header h1 {
-            font-size: 3rem;
+            font-size: clamp(2.5rem, 5vw, 4rem);
             font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 10px;
+            margin-bottom: 16px;
+            letter-spacing: -0.025em;
         }
 
         .header p {
-            font-size: 1.2rem;
-            color: #a0a0a0;
-            font-weight: 300;
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+            min-height: 2.5rem; /* Prevent layout shift */
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
+        /* Cards */
+        .card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-primary);
+            border-radius: 20px;
+            backdrop-filter: blur(20px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        }
+
+        .card:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: var(--border-accent);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Repository Input */
         .repo-input-section {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            padding: 30px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+            padding: 40px;
+            margin-bottom: 40px;
         }
 
         .input-group {
             display: flex;
-            gap: 15px;
-            align-items: center;
+            gap: 16px;
+            align-items: stretch;
+            max-width: 800px;
+            margin: 0 auto;
         }
 
-        .input-group input {
+        .input-wrapper {
             flex: 1;
-            padding: 15px 20px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #e6e6e6;
+            position: relative;
+        }
+
+        .input-wrapper input {
+            width: 100%;
+            padding: 18px 24px;
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-primary);
             font-size: 16px;
-            transition: all 0.3s ease;
+            font-weight: 400;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
         }
 
-        .input-group input:focus {
+        .input-wrapper input:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: var(--accent-primary);
+            background: rgba(255, 255, 255, 0.04);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
-        .input-group input::placeholder {
-            color: #888;
+        .input-wrapper input::placeholder {
+            color: var(--text-muted);
         }
 
+        /* Buttons */
         .btn {
-            padding: 15px 30px;
+            padding: 18px 32px;
             border: none;
-            border-radius: 12px;
+            border-radius: 16px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
         }
 
         .btn-play {
-            padding: 8px 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
+            padding: 10px 16px;
+            font-size: 13px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05));
+            color: var(--accent-primary);
+            border: 1px solid rgba(99, 102, 241, 0.3);
             font-weight: 600;
+            letter-spacing: 0.025em;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
-            color: white;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-play::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-play:hover::before {
+            left: 100%;
         }
 
         .btn-play:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.1));
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
         }
 
         .btn-play:disabled {
-            background: rgba(255, 255, 255, 0.1);
-            color: #666;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
         }
 
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.1);
-            color: #e6e6e6;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
-            transform: translateY(-1px);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
-            color: white;
-        }
-
-        .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(74, 222, 128, 0.3);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(248, 113, 113, 0.3);
-        }
-
-        .issues-section {
+        .btn-play:disabled::before {
             display: none;
         }
 
+        .btn-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid var(--success);
+            box-shadow: none;
+        }
+
+        .btn-success:hover {
+            background: rgba(16, 185, 129, 0.15);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        /* Issues Section */
+        .issues-section {
+            display: none;
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: var(--text-primary);
+        }
+
         .issues-list {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            padding: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 24px;
         }
 
         .issue-row {
             display: flex;
             align-items: center;
-            padding: 15px 20px;
+            padding: 16px 20px;
             border-radius: 12px;
-            margin-bottom: 10px;
-            background: rgba(255, 255, 255, 0.03);
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.01);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .issue-row:hover {
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
             border-color: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
         }
 
         .issue-row.analyzing {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.1);
+            border-color: var(--accent-primary);
+            background: rgba(99, 102, 241, 0.05);
         }
 
         .issue-info {
             flex: 1;
-            margin-right: 20px;
+            margin-right: 24px;
         }
 
         .issue-header {
             display: flex;
             align-items: center;
-            gap: 15px;
-            margin-bottom: 8px;
+            gap: 16px;
+            margin-bottom: 12px;
         }
 
         .issue-number {
-            font-size: 0.9rem;
-            color: #667eea;
+            font-size: 0.875rem;
+            color: var(--accent-primary);
             font-weight: 600;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
         }
 
         .issue-state {
-            padding: 4px 12px;
+            padding: 6px 12px;
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 600;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .issue-state.open {
-            background: rgba(34, 197, 94, 0.2);
-            color: #4ade80;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
         .issue-state.closed {
-            background: rgba(239, 68, 68, 0.2);
-            color: #f87171;
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
         .issue-title {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             line-height: 1.4;
+            color: var(--text-primary);
         }
 
         .issue-body {
-            color: #a0a0a0;
-            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
             line-height: 1.5;
             display: -webkit-box;
             -webkit-line-clamp: 2;
@@ -262,48 +423,180 @@
 
         .issue-actions {
             display: flex;
+            gap: 12px;
             align-items: center;
-            gap: 10px;
         }
 
+        .issue-checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+        }
+
+        .btn-analyze-all {
+            background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-analyze-all:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+        }
+
+        .issues-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 0 24px;
+        }
+
+        .issues-controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .select-all-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .selected-count {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent-primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        /* Multiple Analysis Results */
+        .multiple-analysis-grid {
+            display: grid;
+            gap: 24px;
+            padding: 32px;
+        }
+
+        .issue-analysis-card {
+            background: rgba(255, 255, 255, 0.01);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .issue-analysis-card:hover {
+            background: rgba(255, 255, 255, 0.02);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .issue-analysis-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .issue-analysis-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .issue-analysis-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-completed {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status-analyzing {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent-primary);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .issue-analysis-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .issue-analysis-section {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .issue-analysis-section h4 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            color: var(--accent-primary);
+        }
+
+        /* Analysis Section */
         .analysis-section {
             display: none;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            padding: 30px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 40px;
         }
 
         .analysis-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 30px;
+            gap: 32px;
+            padding: 32px;
         }
 
         .analysis-card {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
-            padding: 25px;
+            background: rgba(255, 255, 255, 0.01);
+            border-radius: 16px;
+            padding: 32px;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .analysis-card h3 {
-            font-size: 1.3rem;
-            margin-bottom: 20px;
-            color: #667eea;
+            font-size: 1.25rem;
+            margin-bottom: 24px;
+            color: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .feasibility-score {
             display: flex;
             align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: 24px;
+            margin-bottom: 24px;
         }
 
         .score-circle {
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -311,73 +604,72 @@
             font-size: 1.5rem;
             font-weight: 700;
             position: relative;
+            background: conic-gradient(from 0deg, var(--accent-primary) 0deg, var(--accent-primary) var(--score-deg), rgba(255, 255, 255, 0.1) var(--score-deg));
         }
 
-        .score-circle::before {
+        .score-circle::after {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
             border-radius: 50%;
-            background: conic-gradient(from 0deg, #667eea 0deg, #667eea var(--score-deg), rgba(255, 255, 255, 0.1) var(--score-deg));
+            background: var(--bg-secondary);
         }
 
         .score-text {
             position: relative;
             z-index: 1;
-        }
-
-        .score-high {
-            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
-        }
-
-        .score-medium {
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        }
-
-        .score-low {
-            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+            color: var(--text-primary);
         }
 
         .plan-steps {
             list-style: none;
+            space-y: 12px;
         }
 
         .plan-step {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-left: 4px solid #667eea;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--accent-primary);
+            transition: all 0.3s ease;
+        }
+
+        .plan-step:hover {
+            background: rgba(255, 255, 255, 0.04);
         }
 
         .plan-step-number {
             font-weight: 600;
-            color: #667eea;
-            margin-bottom: 5px;
+            color: var(--accent-primary);
+            margin-bottom: 8px;
+            font-size: 0.875rem;
         }
 
         .plan-step-description {
-            color: #a0a0a0;
-            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.6;
         }
 
+        /* Loading States */
         .loading {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            padding: 40px;
-            color: #a0a0a0;
+            gap: 16px;
+            padding: 64px;
+            color: var(--text-secondary);
         }
 
         .spinner {
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             border: 2px solid rgba(255, 255, 255, 0.1);
-            border-top: 2px solid #667eea;
+            border-top: 2px solid var(--accent-primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -387,50 +679,71 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Status Messages */
+        .status-message {
+            border-radius: 16px;
+            padding: 24px;
+            margin: 24px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
         .error {
             background: rgba(239, 68, 68, 0.1);
             border: 1px solid rgba(239, 68, 68, 0.3);
-            border-radius: 12px;
-            padding: 20px;
-            color: #f87171;
-            margin: 20px 0;
+            color: #fca5a5;
         }
 
         .success {
-            background: rgba(34, 197, 94, 0.1);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            color: #4ade80;
-            margin: 20px 0;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #6ee7b7;
         }
 
+        .warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fcd34d;
+        }
+
+        /* Execution Section */
         .execution-section {
             display: none;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            padding: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .pr-link {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            color: #667eea;
+            gap: 12px;
+            color: var(--accent-primary);
             text-decoration: none;
             font-weight: 600;
+            padding: 12px 20px;
+            border-radius: 12px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            transition: all 0.3s ease;
         }
 
         .pr-link:hover {
-            text-decoration: underline;
+            background: rgba(99, 102, 241, 0.15);
+            transform: translateY(-1px);
         }
 
+        /* Responsive Design */
         @media (max-width: 768px) {
             .container {
-                padding: 15px;
+                padding: 24px 16px;
+            }
+            
+            .header {
+                padding: 40px 0 20px;
+                margin-bottom: 40px;
             }
             
             .header h1 {
-                font-size: 2rem;
+                font-size: 2.5rem;
             }
             
             .input-group {
@@ -440,30 +753,96 @@
             .issue-row {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 15px;
-            }
-            
-            .issue-actions {
-                align-self: flex-end;
+                gap: 20px;
             }
             
             .analysis-grid {
                 grid-template-columns: 1fr;
+                padding: 24px;
             }
+
+            .feasibility-score {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Selection styles */
+        ::selection {
+            background: rgba(99, 102, 241, 0.3);
+            color: var(--text-primary);
+        }
+
+        /* Devin Badge */
+        .devin-badge {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .devin-badge:hover {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.1));
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .devin-icon {
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: white;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
         }
     </style>
 </head>
 <body>
+    <a href="https://devin.ai" target="_blank" class="devin-badge">
+        <div class="devin-icon">⚡</div>
+        Built with Devin
+    </a>
     <div class="container">
         <div class="header">
-            <img src="/static/cognition.jpeg" alt="Logo" class="logo">
+            <div class="logo-container">
+                <img src="/static/cognition.jpeg" alt="Logo" class="logo">
+            </div>
             <h1>GitHub Issues Agent</h1>
-            <p>AI-Powered Issue Resolution with Devin</p>
+            <p>AI-Powered Issue Resolution with Advanced Automation</p>
         </div>
 
-        <div class="repo-input-section">
+        <div class="card repo-input-section">
             <div class="input-group">
-                <input type="text" id="repoUrl" placeholder="Enter GitHub repository URL (e.g., https://github.com/username/repo)" />
+                <div class="input-wrapper">
+                    <input type="text" id="repoUrl" placeholder="Enter GitHub repository URL (e.g., https://github.com/username/repo)" />
+                </div>
                 <button class="btn btn-primary" onclick="fetchIssues()">
                     <span>🔍</span>
                     Fetch Issues
@@ -472,53 +851,82 @@
         </div>
 
         <div class="issues-section" id="issuesSection">
-            <h2>Repository Issues</h2>
-            <div class="issues-list" id="issuesList"></div>
+            <div class="card">
+                <div class="issues-header">
+                    <h2 class="section-title">Repository Issues</h2>
+                    <div class="issues-controls">
+                        <div class="select-all-container">
+                            <input type="checkbox" id="selectAll" class="issue-checkbox" onchange="toggleSelectAll()">
+                            <label for="selectAll">Select All</label>
+                        </div>
+                        <span class="selected-count" id="selectedCount" style="display: none;">0 selected</span>
+                        <button class="btn btn-analyze-all" onclick="analyzeMultipleIssues()" id="analyzeAllBtn" style="display: none;">
+                            <span>🔍</span>
+                            Analyze Selected
+                        </button>
+                    </div>
+                </div>
+                <div class="issues-list" id="issuesList"></div>
+            </div>
         </div>
 
-        <div class="analysis-section" id="analysisSection">
-            <h2>Analysis Results</h2>
+        <div class="analysis-section card" id="analysisSection">
+            <h2 class="section-title">Analysis Results</h2>
             <div class="loading" id="analysisLoading">
                 <div class="spinner"></div>
                 <span>Analyzing issue with AI agents...</span>
             </div>
             <div class="analysis-grid" id="analysisGrid" style="display: none;">
                 <div class="analysis-card">
-                    <h3>📊 Feasibility Analysis</h3>
+                    <h3>Feasibility Analysis</h3>
                     <div id="feasibilityContent"></div>
                 </div>
                 <div class="analysis-card">
-                    <h3>📋 Implementation Plan</h3>
+                    <h3>Implementation Plan</h3>
                     <div id="planContent"></div>
                 </div>
             </div>
-            <div style="text-align: center; margin-top: 30px;">
-                <button class="btn btn-success" onclick="executeChanges()" id="executeBtn" style="display: none;">
-                    <span>🚀</span>
+            <div style="text-align: center; margin-top: 32px; padding: 32px;">
+                <button class="btn btn-success" onclick="executeChanges()" id="executeBtn" style="display: none; margin: 0 auto;">
                     Execute & Push Changes
                 </button>
             </div>
         </div>
 
-        <div class="execution-section" id="executionSection">
-            <h2>Execution Results</h2>
+        <div class="analysis-section card" id="multipleAnalysisSection" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding: 0 32px;">
+                <h2 class="section-title">Multiple Issue Analysis</h2>
+                <button class="btn btn-success" onclick="executeMultipleIssues()" id="executeAllBtn" style="display: none;">
+                    <span>🚀</span>
+                    Execute All Selected
+                </button>
+            </div>
+            <div class="loading" id="multipleAnalysisLoading">
+                <div class="spinner"></div>
+                <span>Analyzing multiple issues with AI agents...</span>
+            </div>
+            <div class="multiple-analysis-grid" id="multipleAnalysisGrid" style="display: none;"></div>
+        </div>
+
+        <div class="execution-section card" id="executionSection" style="display: none;">
+            <h2 class="section-title">Execution Results</h2>
             <div class="loading" id="executionLoading">
                 <div class="spinner"></div>
-                <span>Executing changes and pushing to repository...</span>
+                <span>This might take up to 15 minutes. Please wait while we execute the changes and push to repository...</span>
             </div>
-            <div id="executionResult" style="display: none;"></div>
+            <div id="executionResult" style="display: none; padding: 32px;"></div>
         </div>
     </div>
 
     <script>
         let currentRepoUrl = '';
-        let currentIssueId = null;
         let issues = [];
+        let selectedIssues = new Set();
 
         async function fetchIssues() {
             const repoUrl = document.getElementById('repoUrl').value.trim();
             if (!repoUrl) {
-                alert('Please enter a repository URL');
+                showError('Please enter a repository URL');
                 return;
             }
 
@@ -527,15 +935,11 @@
             try {
                 const response = await fetch('/api/fetch-issues', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ repo_url: repoUrl })
                 });
 
-                if (!response.ok) {
-                    throw new Error('Failed to fetch issues');
-                }
+                if (!response.ok) throw new Error('Failed to fetch issues');
 
                 const data = await response.json();
                 issues = data.issues;
@@ -549,119 +953,156 @@
             const issuesList = document.getElementById('issuesList');
             issuesList.innerHTML = '';
 
-            issues.forEach(issue => {
-                const issueRow = document.createElement('div');
-                issueRow.className = 'issue-row';
-                issueRow.id = `issue-${issue.id}`;
-
-                issueRow.innerHTML = `
-                    <div class="issue-info">
-                        <div class="issue-header">
-                            <span class="issue-number">#${issue.id}</span>
-                            <span class="issue-state ${issue.state}">${issue.state}</span>
-                        </div>
-                        <div class="issue-title">${issue.title}</div>
-                        <div class="issue-body">${issue.body || 'No description available'}</div>
-                    </div>
-                    <div class="issue-actions">
-                        <button class="btn-play" onclick="analyzeIssue('${issue.id}')" id="play-${issue.id}">
-                            <span>▶️</span>
-                            Analyze
-                        </button>
+            if (issues.length === 0) {
+                issuesList.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🎉</div>
+                        <h3>No issues found</h3>
+                        <p>This repository has no open issues at the moment.</p>
                     </div>
                 `;
-
-                issuesList.appendChild(issueRow);
-            });
+            } else {
+                issues.forEach(issue => {
+                    const issueRow = document.createElement('div');
+                    issueRow.className = 'issue-row';
+                    issueRow.innerHTML = `
+                        <div class="issue-info">
+                            <div class="issue-header">
+                                <span class="issue-number">#${issue.id}</span>
+                                <span class="issue-state ${issue.state}">${issue.state}</span>
+                            </div>
+                            <div class="issue-title">${issue.title}</div>
+                            <div class="issue-body">${issue.body || 'No description available'}</div>
+                        </div>
+                        <div class="issue-actions">
+                            <input type="checkbox" class="issue-checkbox" id="checkbox-${issue.id}" onchange="toggleIssueSelection('${issue.id}')">
+                            <button class="btn-play" onclick="analyzeIssue('${issue.id}')" id="play-${issue.id}">
+                                Analyze
+                            </button>
+                        </div>
+                    `;
+                    issuesList.appendChild(issueRow);
+                });
+            }
 
             document.getElementById('issuesSection').style.display = 'block';
         }
 
         async function analyzeIssue(issueId) {
-            currentIssueId = issueId;
-            
-            // Update UI to show analyzing state
-            const issueRow = document.getElementById(`issue-${issueId}`);
-            const playButton = document.getElementById(`play-${issueId}`);
-            
-            issueRow.classList.add('analyzing');
-            playButton.disabled = true;
-            playButton.innerHTML = '<span>⏳</span> Analyzing...';
-
-            // Show analysis section
-            document.getElementById('analysisSection').style.display = 'block';
-            document.getElementById('analysisGrid').style.display = 'none';
-            document.getElementById('analysisLoading').style.display = 'flex';
-            document.getElementById('executeBtn').style.display = 'none';
+            const button = document.getElementById(`play-${issueId}`);
+            button.disabled = true;
+            button.innerHTML = 'Analyzing...';
 
             try {
                 const response = await fetch('/api/analyze-issue', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        repo_url: currentRepoUrl, 
-                        issue_id: issueId 
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo_url: currentRepoUrl, issue_id: issueId })
                 });
 
-                if (!response.ok) {
-                    throw new Error('Failed to analyze issue');
-                }
+                if (!response.ok) throw new Error('Failed to analyze issue');
 
                 const data = await response.json();
-                
-                if (data.status === 'completed') {
-                    displayAnalysisResults(data.analysis, data.plan);
-                    resetIssueState(issueId);
-                } else {
-                    throw new Error('Analysis failed');
-                }
+                displayAnalysisResults(data.analysis, data.plan, issueId);
             } catch (error) {
                 showError('Failed to analyze issue: ' + error.message);
-                resetIssueState(issueId);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Analyze';
             }
         }
 
-        function resetIssueState(issueId) {
-            const issueRow = document.getElementById(`issue-${issueId}`);
-            const playButton = document.getElementById(`play-${issueId}`);
-            
-            issueRow.classList.remove('analyzing');
-            playButton.disabled = false;
-            playButton.innerHTML = '<span>▶️</span> Analyze';
-        }
-
-
-
-        function displayAnalysisResults(analysis, plan) {
+        function displayAnalysisResults(analysis, plan, issueId) {
+            document.getElementById('analysisSection').style.display = 'block';
             document.getElementById('analysisLoading').style.display = 'none';
             document.getElementById('analysisGrid').style.display = 'grid';
+
+            // Update title
+            document.querySelector('#analysisSection .section-title').textContent = `Analysis Results - Issue #${issueId}`;
+
+            // Store the current issue ID for execution
+            window.currentIssueId = issueId;
 
             // Display feasibility analysis
             const feasibilityContent = document.getElementById('feasibilityContent');
             const score = analysis?.feasibility_score || 0;
-            const scoreClass = score >= 70 ? 'score-high' : score >= 40 ? 'score-medium' : 'score-low';
             const scoreDeg = (score / 100) * 360;
 
             feasibilityContent.innerHTML = `
                 <div class="feasibility-score">
-                    <div class="score-circle ${scoreClass}" style="--score-deg: ${scoreDeg}deg">
-                        <div class="score-text">${score}/100</div>
+                    <div class="score-circle" style="--score-deg: ${scoreDeg}deg">
+                        <div class="score-text">${score}%</div>
                     </div>
                     <div>
-                        <div style="font-weight: 600; margin-bottom: 5px;">Feasibility Score</div>
-                        <div style="color: #a0a0a0; font-size: 0.9rem;">
-                            ${score >= 70 ? 'High feasibility' : score >= 40 ? 'Medium feasibility' : 'Low feasibility'}
+                        <div style="font-weight: 600; margin-bottom: 8px; font-size: 1.125rem;">Feasibility Score</div>
+                        <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                            ${score >= 70 ? '✅ High feasibility' : score >= 40 ? '⚠️ Medium feasibility' : '❌ Low feasibility'}
                         </div>
                     </div>
                 </div>
-                ${analysis?.risks ? `
+                
+                <div style="margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Complexity Score</div>
+                        <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                            ${analysis?.complexity_score || 0}/100
+                            <span style="color: ${analysis?.complexity_score >= 70 ? 'var(--danger)' : analysis?.complexity_score >= 40 ? 'var(--warning)' : 'var(--success)'}">
+                                ${analysis?.complexity_score >= 70 ? ' (High)' : analysis?.complexity_score >= 40 ? ' (Medium)' : ' (Low)'}
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Confidence</div>
+                        <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                            ${analysis?.confidence || 0}/100
+                            <span style="color: ${analysis?.confidence >= 70 ? 'var(--success)' : analysis?.confidence >= 40 ? 'var(--warning)' : 'var(--danger)'}">
+                                ${analysis?.confidence >= 70 ? ' (High)' : analysis?.confidence >= 40 ? ' (Medium)' : ' (Low)'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                ${analysis?.scope_assessment ? `
                     <div style="margin-top: 20px;">
-                        <div style="font-weight: 600; margin-bottom: 10px; color: #f87171;">⚠️ Risks:</div>
-                        <ul style="color: #a0a0a0; font-size: 0.9rem;">
-                            ${analysis.risks.map(risk => `<li>${risk}</li>`).join('')}
+                        <div style="font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Scope Assessment</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Size</div>
+                                <div style="color: var(--text-primary); font-weight: 500;">${analysis.scope_assessment.size || 'Unknown'}</div>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Impact</div>
+                                <div style="color: var(--text-primary); font-weight: 500;">${analysis.scope_assessment.impact || 'Unknown'}</div>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${analysis?.technical_analysis?.estimated_files ? `
+                    <div style="margin-top: 20px;">
+                        <div style="font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Files to Modify</div>
+                        <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                ${analysis.technical_analysis.estimated_files.map(file => `
+                                    <span style="background: rgba(99, 102, 241, 0.1); color: var(--accent-primary); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; border: 1px solid rgba(99, 102, 241, 0.2);">
+                                        ${file}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${analysis?.technical_analysis?.risks ? `
+                    <div style="margin-top: 20px;">
+                        <div style="font-weight: 600; margin-bottom: 12px; color: var(--warning); display: flex; align-items: center; gap: 8px;">
+                            ⚠️ Potential Risks
+                        </div>
+                        <ul style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6; list-style: none; padding-left: 0;">
+                            ${analysis.technical_analysis.risks.map(risk => `<li style="margin-bottom: 8px; padding-left: 20px; position: relative;">
+                                <span style="position: absolute; left: 0; color: var(--warning);">•</span>
+                                ${risk}
+                            </li>`).join('')}
                         </ul>
                     </div>
                 ` : ''}
@@ -670,23 +1111,23 @@
             // Display implementation plan
             const planContent = document.getElementById('planContent');
             planContent.innerHTML = `
-                <div style="margin-bottom: 20px;">
-                    <div style="font-weight: 600; margin-bottom: 5px;">Summary</div>
-                    <div style="color: #a0a0a0; font-size: 0.9rem;">${plan?.summary || 'No summary available'}</div>
+                <div style="margin-bottom: 24px;">
+                    <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Summary</div>
+                    <div style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6;">${plan?.summary || 'No summary available'}</div>
                 </div>
-                <div style="margin-bottom: 20px;">
-                    <div style="font-weight: 600; margin-bottom: 5px;">Estimated Effort</div>
-                    <div style="color: #a0a0a0; font-size: 0.9rem;">${plan?.estimated_effort || 'Unknown'}</div>
+                <div style="margin-bottom: 24px;">
+                    <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Estimated Effort</div>
+                    <div style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6;">${plan?.estimated_effort || 'Unknown'}</div>
                 </div>
                 ${plan?.action_plan ? `
                     <div>
-                        <div style="font-weight: 600; margin-bottom: 10px;">Action Plan</div>
+                        <div style="font-weight: 600; margin-bottom: 16px; color: var(--text-primary);">Action Plan</div>
                         <ul class="plan-steps">
                             ${plan.action_plan.map(step => `
                                 <li class="plan-step">
                                     <div class="plan-step-number">Step ${step.step}</div>
                                     <div class="plan-step-description">${step.description}</div>
-                                    ${step.files ? `<div style="color: #667eea; font-size: 0.8rem; margin-top: 5px;">Files: ${step.files.join(', ')}</div>` : ''}
+                                    ${step.files ? `<div style="color: var(--accent-primary); font-size: 0.75rem; margin-top: 8px; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;">Files: ${step.files.join(', ')}</div>` : ''}
                                 </li>
                             `).join('')}
                         </ul>
@@ -698,85 +1139,468 @@
         }
 
         async function executeChanges() {
-            document.getElementById('executionSection').style.display = 'block';
-            document.getElementById('executionResult').style.display = 'none';
-            document.getElementById('executionLoading').style.display = 'flex';
+            if (!window.currentIssueId) {
+                showError('No issue selected for execution');
+                return;
+            }
+
+            console.log('🚀 Starting execution for issue:', window.currentIssueId);
+            console.log('📡 Making request to:', '/api/execute');
+            console.log('📦 Request body:', { repo_url: currentRepoUrl, issue_id: window.currentIssueId });
+
+            // Minimize the analysis section and show "Agent in progress"
+            const analysisSection = document.getElementById('analysisSection');
+            const analysisGrid = document.getElementById('analysisGrid');
+            const feasibilityContent = document.getElementById('feasibilityContent');
+            const planContent = document.getElementById('planContent');
+            const executeBtn = document.getElementById('executeBtn');
+
+            // Hide the detailed content
+            analysisGrid.style.display = 'none';
+            executeBtn.style.display = 'none';
+
+            // Create a new container for the execution progress
+            const executionProgressContainer = document.createElement('div');
+            executionProgressContainer.id = 'executionProgressContainer';
+            executionProgressContainer.style.cssText = `
+                padding: 40px 20px;
+                text-align: center;
+                background: rgba(255, 255, 255, 0.02);
+                border-radius: 12px;
+                margin: 20px 0;
+            `;
+
+            // Show "Agent in progress" message
+            executionProgressContainer.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px;">
+                    <div style="font-size: 2rem; margin-bottom: 16px;">🤖</div>
+                    <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Agent 4 is working on your changes...</div>
+                    <div style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 16px;">Executing changes for Issue #${window.currentIssueId}</div>
+                    <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; padding: 16px; margin-top: 16px;">
+                        <div style="color: var(--accent-primary); font-weight: 500; margin-bottom: 8px;">☕ Time to grab a coffee!</div>
+                        <div style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5;">
+                            The pull request link will be shared here in up to 15 minutes.<br>
+                            You can monitor real-time progress in the Devin frontend.
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Insert the progress container after the title
+            const sectionTitle = analysisSection.querySelector('.section-title');
+            analysisSection.insertBefore(executionProgressContainer, sectionTitle.nextSibling);
 
             try {
                 const response = await fetch('/api/execute', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        repo_url: currentRepoUrl, 
-                        issue_id: currentIssueId 
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo_url: currentRepoUrl, issue_id: window.currentIssueId })
                 });
 
+                console.log('📥 Response status:', response.status);
+                console.log('📥 Response ok:', response.ok);
+
                 if (!response.ok) {
-                    throw new Error('Failed to execute changes');
+                    const errorText = await response.text();
+                    console.error('❌ Response error:', errorText);
+                    throw new Error(`Failed to execute changes: ${response.status} ${response.statusText}`);
                 }
 
                 const data = await response.json();
+                console.log('📥 Response data:', data);
                 
                 if (data.status === 'completed') {
-                    displayExecutionResults(data.result);
+                    // Check if we have a PR URL
+                    let prUrl = data.result?.pr_url;
+                    
+                    if (!prUrl && data.result?.session_result) {
+                        // Try to extract PR URL from session result
+                        const sessionText = data.result.session_result;
+                        const prMatch = sessionText.match(/https:\/\/github\.com\/[^\/]+\/[^\/]+\/pull\/\d+/);
+                        if (prMatch) {
+                            prUrl = prMatch[0];
+                        }
+                    }
+                    
+                    // Show basic completion message
+                    executionProgressContainer.innerHTML = `
+                        <div style="text-align: center; padding: 40px 20px;">
+                            <div style="font-size: 2rem; margin-bottom: 16px;">✅</div>
+                            <div style="font-weight: 600; margin-bottom: 8px; color: var(--success);">Execution Completed!</div>
+                            <div style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 16px;">Changes have been executed for Issue #${window.currentIssueId}</div>
+                            <div style="margin-top: 16px; color: var(--text-muted); font-size: 0.75rem;">Check the Devin frontend for results</div>
+                        </div>
+                    `;
+                    
+                    showSuccess('Execution completed! Check the Devin frontend for results.');
+                    
+                    // If we have a PR URL, show it after a short delay
+                    if (prUrl) {
+                        setTimeout(() => {
+                            executionProgressContainer.innerHTML = `
+                                <div style="text-align: center; padding: 40px 20px;">
+                                    <div style="font-size: 2rem; margin-bottom: 16px;">✅</div>
+                                    <div style="font-weight: 600; margin-bottom: 8px; color: var(--success);">Execution Completed!</div>
+                                    <div style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 16px;">Changes have been executed for Issue #${window.currentIssueId}</div>
+                                    <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; padding: 16px; margin-top: 16px;">
+                                        <div style="color: var(--success); font-weight: 500; margin-bottom: 8px;">🔗 Pull Request Created</div>
+                                        <div style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5;">
+                                            <a href="${prUrl}" target="_blank" style="color: var(--accent-primary); text-decoration: underline; word-break: break-all;">${prUrl}</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            
+                            showSuccess(`✅ Execution completed! Pull request created: ${prUrl}`);
+                        }, 30000); // 30 second delay
+                    } else {
+                        // If no PR URL found, show a message after 30 seconds suggesting to check Devin frontend
+                        setTimeout(() => {
+                            executionProgressContainer.innerHTML = `
+                                <div style="text-align: center; padding: 40px 20px;">
+                                    <div style="font-size: 2rem; margin-bottom: 16px;">✅</div>
+                                    <div style="font-weight: 600; margin-bottom: 8px; color: var(--success);">Execution Completed!</div>
+                                    <div style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 16px;">Changes have been executed for Issue #${window.currentIssueId}</div>
+                                    <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.2); border-radius: 8px; padding: 16px; margin-top: 16px;">
+                                        <div style="color: var(--warning); font-weight: 500; margin-bottom: 8px;">📋 Check Devin Frontend</div>
+                                        <div style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5;">
+                                            The pull request should be available in the Devin frontend.<br>
+                                            Look for the PR link in the session output.
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }, 30000); // 30 second delay
+                    }
                 } else {
                     throw new Error('Execution failed');
                 }
             } catch (error) {
+                console.error('❌ Execution error:', error);
+                
+                // Show error message
+                executionProgressContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <div style="font-size: 2rem; margin-bottom: 16px;">❌</div>
+                        <div style="font-weight: 600; margin-bottom: 8px; color: var(--danger);">Execution Failed</div>
+                        <div style="color: var(--text-secondary); font-size: 0.875rem;">${error.message}</div>
+                    </div>
+                `;
+                
                 showError('Failed to execute changes: ' + error.message);
             }
         }
 
-        function displayExecutionResults(result) {
-            document.getElementById('executionLoading').style.display = 'none';
-            const executionResult = document.getElementById('executionResult');
-            executionResult.style.display = 'block';
+        async function analyzeMultipleIssues() {
+            if (selectedIssues.size === 0) {
+                showError('Please select at least one issue to analyze');
+                return;
+            }
 
-            if (result?.status === 'success') {
-                executionResult.innerHTML = `
-                    <div class="success">
-                        <h3>✅ Changes pushed successfully!</h3>
-                        ${result.pr_url ? `
-                            <p>Pull Request created:</p>
-                            <a href="${result.pr_url}" target="_blank" class="pr-link">
-                                <span>🔗</span>
-                                View Pull Request
-                            </a>
-                        ` : '<p>PR URL not found in session messages</p>'}
-                    </div>
-                `;
-            } else if (result?.session_result?.error === 'api_errors') {
-                executionResult.innerHTML = `
-                    <div class="success">
-                        <h3>⚠️ API connection issues detected</h3>
-                        <p>Session ID: ${result.session_result.session_id}</p>
-                        <p>The session might still be running on the Devin frontend. Check the frontend to see if the execution completed successfully.</p>
-                    </div>
-                `;
-            } else {
-                executionResult.innerHTML = `
-                    <div class="error">
-                        <h3>❌ Push failed</h3>
-                        <p>${result?.reason || 'Unknown error'}</p>
-                    </div>
-                `;
+            const button = document.getElementById('analyzeAllBtn');
+            button.disabled = true;
+            button.innerHTML = 'Analyzing...';
+
+            // Show multiple analysis section
+            document.getElementById('multipleAnalysisSection').style.display = 'block';
+            document.getElementById('multipleAnalysisLoading').style.display = 'flex';
+            document.getElementById('multipleAnalysisGrid').style.display = 'none';
+
+            // Create analysis cards
+            const analysisGrid = document.getElementById('multipleAnalysisGrid');
+            analysisGrid.innerHTML = '';
+            selectedIssues.forEach(issueId => {
+                const issue = issues.find(i => i.id === issueId);
+                if (issue) {
+                    const card = document.createElement('div');
+                    card.className = 'issue-analysis-card';
+                    card.id = `analysis-card-${issue.id}`;
+                    card.innerHTML = `
+                        <div class="issue-analysis-header">
+                            <div class="issue-analysis-title">Issue #${issue.id}: ${issue.title}</div>
+                            <div class="issue-analysis-status status-analyzing">Analyzing...</div>
+                        </div>
+                        <div class="issue-analysis-content">
+                            <div class="issue-analysis-section">
+                                <h4>Feasibility Analysis</h4>
+                                <div class="loading"><div class="spinner"></div><span>Analyzing...</span></div>
+                            </div>
+                            <div class="issue-analysis-section">
+                                <h4>Implementation Plan</h4>
+                                <div class="loading"><div class="spinner"></div><span>Planning...</span></div>
+                            </div>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button class="btn btn-success" onclick="executeChangesForIssue('${issue.id}')" id="execute-${issue.id}" style="display: none;">
+                                Execute & Push Changes
+                            </button>
+                        </div>
+                    `;
+                    analysisGrid.appendChild(card);
+                }
+            });
+
+            try {
+                const response = await fetch('/api/analyze-multiple-issues', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo_url: currentRepoUrl, issue_ids: Array.from(selectedIssues) })
+                });
+
+                if (!response.ok) throw new Error('Failed to analyze issues');
+
+                const data = await response.json();
+                
+                // Hide loading and show grid
+                document.getElementById('multipleAnalysisLoading').style.display = 'none';
+                document.getElementById('multipleAnalysisGrid').style.display = 'grid';
+
+                // Update all cards with results
+                if (data.results) {
+                    data.results.forEach(result => {
+                        updateAnalysisCard(result);
+                    });
+                }
+
+            } catch (error) {
+                showError('Failed to analyze issues: ' + error.message);
+                document.getElementById('multipleAnalysisLoading').style.display = 'none';
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Analyze Selected';
             }
         }
 
+        function updateAnalysisCard(result) {
+            const card = document.getElementById(`analysis-card-${result.issue_id}`);
+            if (!card) return;
+
+            const statusElement = card.querySelector('.issue-analysis-status');
+            const feasibilitySection = card.querySelector('.issue-analysis-section:first-child');
+            const planSection = card.querySelector('.issue-analysis-section:last-child');
+            const executeBtn = document.getElementById(`execute-${result.issue_id}`);
+
+            if (result.error) {
+                statusElement.className = 'issue-analysis-status status-error';
+                statusElement.textContent = 'Error';
+                feasibilitySection.innerHTML = '<h4>Feasibility Analysis</h4><div class="status-message error">Analysis failed: ' + result.error + '</div>';
+                planSection.innerHTML = '<h4>Implementation Plan</h4><div class="status-message error">Planning failed: ' + result.error + '</div>';
+                return;
+            }
+
+            statusElement.className = 'issue-analysis-status status-completed';
+            statusElement.textContent = 'Completed';
+
+            // Update feasibility analysis with full details
+            const analysis = result.analysis;
+            if (analysis) {
+                const score = analysis.feasibility_score || 0;
+                const scoreDeg = (score / 100) * 360;
+
+                feasibilitySection.innerHTML = `
+                    <h4>Feasibility Analysis</h4>
+                    <div class="feasibility-score">
+                        <div class="score-circle" style="--score-deg: ${scoreDeg}deg">
+                            <div class="score-text">${score}%</div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 8px; font-size: 1.125rem;">Feasibility Score</div>
+                            <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                                ${score >= 70 ? '✅ High feasibility' : score >= 40 ? '⚠️ Medium feasibility' : '❌ Low feasibility'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Complexity Score</div>
+                            <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                                ${analysis.complexity_score || 0}/100
+                                <span style="color: ${analysis.complexity_score >= 70 ? 'var(--danger)' : analysis.complexity_score >= 40 ? 'var(--warning)' : 'var(--success)'}">
+                                    ${analysis.complexity_score >= 70 ? ' (High)' : analysis.complexity_score >= 40 ? ' (Medium)' : ' (Low)'}
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Confidence</div>
+                            <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                                ${analysis.confidence || 0}/100
+                                <span style="color: ${analysis.confidence >= 70 ? 'var(--success)' : analysis.confidence >= 40 ? 'var(--warning)' : 'var(--danger)'}">
+                                    ${analysis.confidence >= 70 ? ' (High)' : analysis.confidence >= 40 ? ' (Medium)' : ' (Low)'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${analysis.scope_assessment ? `
+                        <div style="margin-top: 20px;">
+                            <div style="font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Scope Assessment</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Size</div>
+                                    <div style="color: var(--text-primary); font-weight: 500;">${analysis.scope_assessment.size || 'Unknown'}</div>
+                                </div>
+                                <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Impact</div>
+                                    <div style="color: var(--text-primary); font-weight: 500;">${analysis.scope_assessment.impact || 'Unknown'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${analysis.technical_analysis?.estimated_files ? `
+                        <div style="margin-top: 20px;">
+                            <div style="font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Files to Modify</div>
+                            <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    ${analysis.technical_analysis.estimated_files.map(file => `
+                                        <span style="background: rgba(99, 102, 241, 0.1); color: var(--accent-primary); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; border: 1px solid rgba(99, 102, 241, 0.2);">
+                                            ${file}
+                                        </span>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${analysis.technical_analysis?.risks ? `
+                        <div style="margin-top: 20px;">
+                            <div style="font-weight: 600; margin-bottom: 12px; color: var(--warning); display: flex; align-items: center; gap: 8px;">
+                                ⚠️ Potential Risks
+                            </div>
+                            <ul style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6; list-style: none; padding-left: 0;">
+                                ${analysis.technical_analysis.risks.map(risk => `<li style="margin-bottom: 8px; padding-left: 20px; position: relative;">
+                                    <span style="position: absolute; left: 0; color: var(--warning);">•</span>
+                                    ${risk}
+                                </li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                `;
+            }
+
+            // Update plan with full details
+            const plan = result.plan;
+            if (plan) {
+                planSection.innerHTML = `
+                    <h4>Implementation Plan</h4>
+                    <div style="margin-bottom: 24px;">
+                        <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Summary</div>
+                        <div style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6;">${plan.summary || 'No summary available'}</div>
+                    </div>
+                    <div style="margin-bottom: 24px;">
+                        <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Estimated Effort</div>
+                        <div style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6;">${plan.estimated_effort || 'Unknown'}</div>
+                    </div>
+                    ${plan.action_plan ? `
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 16px; color: var(--text-primary);">Action Plan</div>
+                            <ul class="plan-steps">
+                                ${plan.action_plan.map(step => `
+                                    <li class="plan-step">
+                                        <div class="plan-step-number">Step ${step.step}</div>
+                                        <div class="plan-step-description">${step.description}</div>
+                                        ${step.files ? `<div style="color: var(--accent-primary); font-size: 0.75rem; margin-top: 8px; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;">Files: ${step.files.join(', ')}</div>` : ''}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                `;
+            }
+
+            if (executeBtn) {
+                executeBtn.style.display = 'inline-flex';
+            }
+        }
+
+        async function executeChangesForIssue(issueId) {
+            const button = document.getElementById(`execute-${issueId}`);
+            button.disabled = true;
+            button.innerHTML = 'Executing...';
+
+            try {
+                const response = await fetch('/api/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo_url: currentRepoUrl, issue_id: issueId })
+                });
+
+                if (!response.ok) throw new Error('Failed to execute changes');
+
+                const result = await response.json();
+                
+                if (result.status === 'completed') {
+                    button.innerHTML = '✅ Completed';
+                    showSuccess(`Execution completed for issue #${issueId}! Check the Devin frontend for results.`);
+                } else {
+                    throw new Error('Execution failed');
+                }
+            } catch (error) {
+                showError(`Failed to execute issue #${issueId}: ${error.message}`);
+                button.innerHTML = '❌ Failed';
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        // Simple utility functions
         function showError(message) {
             const errorDiv = document.createElement('div');
-            errorDiv.className = 'error';
+            errorDiv.className = 'status-message error';
             errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
-            
-            // Insert at the top of the container
-            const container = document.querySelector('.container');
-            container.insertBefore(errorDiv, container.firstChild);
-            
-            // Remove after 5 seconds
+            document.querySelector('.container').insertBefore(errorDiv, document.querySelector('.container').firstChild);
             setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'status-message success';
+            successDiv.innerHTML = `<strong>Success:</strong> ${message}`;
+            document.querySelector('.container').insertBefore(successDiv, document.querySelector('.container').firstChild);
+            setTimeout(() => successDiv.remove(), 5000);
+        }
+
+        // Issue selection functions
+        function toggleIssueSelection(issueId) {
+            const checkbox = document.getElementById(`checkbox-${issueId}`);
+            if (checkbox.checked) {
+                selectedIssues.add(issueId);
+            } else {
+                selectedIssues.delete(issueId);
+            }
+            updateSelectionUI();
+        }
+
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.issue-checkbox');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+                const issueId = checkbox.id.replace('checkbox-', '');
+                if (selectAllCheckbox.checked) {
+                    selectedIssues.add(issueId);
+                } else {
+                    selectedIssues.delete(issueId);
+                }
+            });
+            
+            updateSelectionUI();
+        }
+
+        function updateSelectionUI() {
+            const selectedCount = document.getElementById('selectedCount');
+            const analyzeAllBtn = document.getElementById('analyzeAllBtn');
+            
+            if (selectedIssues.size > 0) {
+                selectedCount.style.display = 'inline-block';
+                selectedCount.textContent = `${selectedIssues.size} selected`;
+                analyzeAllBtn.style.display = 'inline-flex';
+            } else {
+                selectedCount.style.display = 'none';
+                analyzeAllBtn.style.display = 'none';
+            }
         }
 
         // Allow Enter key to submit repo URL
@@ -787,4 +1611,4 @@
         });
     </script>
 </body>
-</html> 
+</html>

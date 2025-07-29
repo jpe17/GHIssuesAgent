@@ -19,5 +19,8 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8844,
         reload=True,
-        log_level="info"
+        log_level="info",
+        workers=1,  # Single worker but with proper async handling
+        loop="asyncio",
+        http="httptools"
     ) 

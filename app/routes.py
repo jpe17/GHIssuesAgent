@@ -1,12 +1,16 @@
 """Simple FastAPI routes for GitHub Issues Agent frontend."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from typing import List
 import json
 import os
 import sys
 import time
+import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Add the parent directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,6 +30,10 @@ class RepoRequest(BaseModel):
 class IssueRequest(BaseModel):
     repo_url: str
     issue_id: str
+
+class MultiIssueRequest(BaseModel):
+    repo_url: str
+    issue_ids: list[str]
 
 @router.get("/", response_class=HTMLResponse)
 async def get_index():
@@ -59,9 +67,9 @@ async def fetch_issues(request: RepoRequest):
                 with open(file_path, 'r') as f:
                     issue_data = json.load(f)
                     issues.append({
-                        "id": issue_id,
+                        "id": str(issue_data.get('number', issue_id)),
                         "title": issue_data.get('title', 'No title'),
-                        "state": issue_data.get('state', 'unknown'),
+                        "state": issue_data.get('state', 'open'),
                         "body": issue_data.get('body', ''),
                         "created_at": issue_data.get('created_at', ''),
                         "updated_at": issue_data.get('updated_at', '')
@@ -74,72 +82,231 @@ async def fetch_issues(request: RepoRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/api/analyze-issue")
-async def analyze_issue(request: IssueRequest):
-    """Analyze a specific issue with agents 2 and 3."""
+def analyze_single_issue(repo_url: str, issue_id: str) -> dict:
+    """Analyze a single issue (for parallel processing)."""
+    import threading
+    thread_id = threading.current_thread().ident
+    
     try:
+        print(f"🎯 Starting analysis for issue #{issue_id} (Thread: {thread_id})")
+        
         # Load issue
-        issue_file_path = get_issue_file_path("cache", request.repo_url, request.issue_id)
+        issue_file_path = get_issue_file_path("cache", repo_url, issue_id)
         if not os.path.exists(issue_file_path):
-            raise HTTPException(status_code=404, detail="Issue not found")
+            return {"issue_id": issue_id, "error": "Issue not found"}
         
         with open(issue_file_path, 'r') as f:
             issue = json.load(f)
         
-        # Run analysis directly (no background tasks)
-        print(f"Starting analysis for issue #{request.issue_id}")
+        # Run Agents 2 & 3 in parallel using asyncio
+        print(f"🚀 Creating Agent 2 & 3 sessions for issue #{issue_id} (Thread: {thread_id})")
         
-        # Run Agent 2 (Feasibility Analysis)
-        agent2 = FeasibilityAnalyzerAgent()
-        analysis = agent2.analyze_issue_feasibility(issue, request.repo_url)
+        async def run_parallel_analysis():
+            loop = asyncio.get_event_loop()
+            
+            # Start both agents simultaneously
+            agent2_task = loop.run_in_executor(None, lambda: FeasibilityAnalyzerAgent().analyze_issue_feasibility(issue, repo_url))
+            agent3_task = loop.run_in_executor(None, lambda: PlanAgent().review_files_and_plan(issue, repo_url))
+            
+            # Wait for both to complete
+            analysis, plan = await asyncio.gather(agent2_task, agent3_task)
+            return analysis, plan
         
-        # Run Agent 3 (Planning)
-        agent3 = PlanAgent()
-        plan = agent3.review_files_and_plan(issue, request.repo_url)
+        # Run the async function in the current thread
+        try:
+            # Create new event loop for this thread if needed
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            analysis, plan = loop.run_until_complete(run_parallel_analysis())
+            
+        except Exception as e:
+            print(f"❌ Parallel analysis failed for issue #{issue_id}: {str(e)}")
+            return {"issue_id": issue_id, "error": f"Parallel analysis failed: {str(e)}"}
+        
+        print(f"✅ Agent 2 completed for issue #{issue_id} (Thread: {thread_id})")
+        print(f"✅ Agent 3 completed for issue #{issue_id} (Thread: {thread_id})")
+        print(f"🎉 Analysis completed for issue #{issue_id} (Thread: {thread_id})")
         
         return {
+            "issue_id": issue_id,
             "status": "completed",
             "analysis": analysis,
             "plan": plan
         }
+    except Exception as e:
+        print(f"💥 Analysis failed for issue #{issue_id} (Thread: {thread_id}): {str(e)}")
+        return {"issue_id": issue_id, "error": str(e)}
+
+@router.post("/api/analyze-issue")
+async def analyze_issue(request: IssueRequest):
+    """Analyze a specific issue with agents 2 and 3."""
+    try:
+        print(f"🎯 Starting individual analysis for issue #{request.issue_id}")
+        
+        # Use asyncio.run_in_executor to offload blocking call to thread
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, analyze_single_issue, request.repo_url, request.issue_id)
+        
+        if "error" in result:
+            print(f"❌ Individual analysis failed for issue #{request.issue_id}: {result['error']}")
+            raise HTTPException(status_code=404, detail=result["error"])
+        
+        print(f"✅ Individual analysis completed for issue #{request.issue_id}")
+        return result
         
     except Exception as e:
+        print(f"💥 Individual analysis failed for issue #{request.issue_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/api/execute")
-async def execute_changes(request: IssueRequest):
-    """Execute the plan and push changes."""
+@router.post("/api/analyze-multiple-issues")
+async def analyze_multiple_issues(request: MultiIssueRequest):
+    """Analyze multiple issues in parallel."""
     try:
+        print(f"🔍 MULTIPLE ANALYSIS STARTED: {len(request.issue_ids)} issues: {request.issue_ids}")
+        print(f"📍 Repo URL: {request.repo_url}")
+        
+        # Run all issues in parallel with ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(len(request.issue_ids), 5)) as executor:
+            print(f"🏭 Created ThreadPoolExecutor with {min(len(request.issue_ids), 5)} workers")
+            
+            futures = []
+            for issue_id in request.issue_ids:
+                print(f"📤 Submitting analysis task for issue #{issue_id}")
+                future = executor.submit(analyze_single_issue, request.repo_url, issue_id)
+                futures.append(future)
+            
+            print(f"📊 Submitted {len(futures)} tasks to executor")
+            
+            # Collect results as they complete
+            results = []
+            for i, future in enumerate(futures):
+                try:
+                    print(f"⏳ Waiting for result {i+1}/{len(futures)}")
+                    result = future.result()
+                    print(f"✅ Got result for issue: {result.get('issue_id', 'unknown')}")
+                    results.append(result)
+                except Exception as e:
+                    print(f"❌ Error getting result {i+1}: {str(e)}")
+                    results.append({"error": str(e)})
+        
+        print(f"🎉 MULTIPLE ANALYSIS COMPLETED: {len(results)} results")
+        return {"results": results}
+        
+    except Exception as e:
+        print(f"💥 MULTIPLE ANALYSIS FAILED: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+def execute_single_issue(repo_url: str, issue_id: str) -> dict:
+    """Execute a single issue."""
+    try:
+        print(f"🚀 Starting execution for issue #{issue_id}")
+        
         # Load issue
-        issue_file_path = get_issue_file_path("cache", request.repo_url, request.issue_id)
+        issue_file_path = get_issue_file_path("cache", repo_url, issue_id)
         if not os.path.exists(issue_file_path):
-            raise HTTPException(status_code=404, detail="Issue not found")
+            return {"issue_id": issue_id, "error": "Issue not found"}
         
         with open(issue_file_path, 'r') as f:
             issue = json.load(f)
         
-        # Run analysis first to get the plan
-        print(f"Getting plan for issue #{request.issue_id}")
+        # Get plan first
+        print(f"📋 Getting plan for issue #{issue_id}")
         agent3 = PlanAgent()
-        plan = agent3.review_files_and_plan(issue, request.repo_url)
+        plan = agent3.review_files_and_plan(issue, repo_url)
         
         if not plan:
-            raise HTTPException(status_code=400, detail="No plan available")
+            return {"issue_id": issue_id, "error": "No plan available"}
         
         # Execute the plan
-        print(f"Executing plan for issue #{request.issue_id}")
+        print(f"⚡ Executing plan for issue #{issue_id}")
         agent4 = ExecutorAgent()
-        push_result = agent4.execute_and_push(plan, request.repo_url)
+        push_result = agent4.execute_and_push(plan, repo_url)
+        
+        print(f"✅ Execution completed for issue #{issue_id}")
         
         return {
+            "issue_id": issue_id,
             "status": "completed",
             "result": push_result
         }
         
     except Exception as e:
+        print(f"❌ Execution failed for issue #{issue_id}: {str(e)}")
+        return {"issue_id": issue_id, "error": str(e)}
+
+@router.post("/api/execute")
+async def execute_changes(request: IssueRequest):
+    """Execute the plan and push changes."""
+    try:
+        print(f"🚀 Starting execution for issue #{request.issue_id}")
+        
+        # Use asyncio.run_in_executor to offload blocking call to thread
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, execute_single_issue, request.repo_url, request.issue_id)
+        
+        if "error" in result:
+            print(f"❌ Execution failed for issue #{request.issue_id}: {result['error']}")
+            raise HTTPException(status_code=404, detail=result["error"])
+        
+        print(f"✅ Execution completed for issue #{request.issue_id}")
+        return result
+        
+    except Exception as e:
+        print(f"💥 Execution failed for issue #{request.issue_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/execute-multiple-issues")
+async def execute_multiple_issues(request: MultiIssueRequest):
+    """Execute multiple issues in parallel."""
+    try:
+        print(f"🚀 MULTIPLE EXECUTION STARTED: {len(request.issue_ids)} issues: {request.issue_ids}")
+        print(f"📍 Repo URL: {request.repo_url}")
+        
+        # Run all issues in parallel with ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(len(request.issue_ids), 3)) as executor:
+            print(f"🏭 Created ThreadPoolExecutor with {min(len(request.issue_ids), 3)} workers")
+            
+            futures = []
+            for i, issue_id in enumerate(request.issue_ids):
+                print(f"📤 Submitting execution task for issue #{issue_id}")
+                future = executor.submit(execute_single_issue, request.repo_url, issue_id)
+                futures.append(future)
+                
+                # Add delay between submissions to avoid rate limiting
+                if i < len(request.issue_ids) - 1:  # Don't sleep after the last one
+                    print(f"⏸️ Waiting 3 seconds before next execution submission...")
+                    time.sleep(3)  # 3 second delay between executions
+            
+            print(f"📊 Submitted {len(futures)} tasks to executor")
+            
+            # Collect results as they complete
+            results = []
+            for i, future in enumerate(futures):
+                try:
+                    print(f"⏳ Waiting for execution result {i+1}/{len(futures)}")
+                    result = future.result()
+                    print(f"✅ Got execution result for issue: {result.get('issue_id', 'unknown')}")
+                    results.append(result)
+                except Exception as e:
+                    print(f"❌ Error getting execution result {i+1}: {str(e)}")
+                    results.append({"error": str(e)})
+        
+        print(f"🎉 MULTIPLE EXECUTION COMPLETED: {len(results)} results")
+        return {"results": results}
+        
+    except Exception as e:
+        print(f"💥 MULTIPLE EXECUTION FAILED: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 # Dependency for Devin session (placeholder)
 def get_devin_session():
     """Get the Devin API session."""
-    return None 
+    return None

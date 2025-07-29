@@ -147,12 +147,12 @@ def run_agents_on_issue(repo_url, issue_id):
                 return
     
     # Show both results together
-    print(f"\n📊 Feasibility Analysis:")
+    print(f"\nFeasibility Analysis:")
     print(f"   Score: {analysis.get('feasibility_score', 0)}/100")
     if analysis.get('feasibility_score', 0) < 50:
         print("   ⚠️  Low feasibility score")
     
-    print(f"\n📋 Implementation Plan:")
+    print(f"\nImplementation Plan:")
     print(f"   Summary: {plan.get('summary', 'No summary available')}")
     print(f"   Estimated Effort: {plan.get('estimated_effort', 'Unknown')}")
     

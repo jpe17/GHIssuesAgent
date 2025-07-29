@@ -4,7 +4,7 @@ import json
 import os
 from typing import Dict
 from core.session_manager import create_devin_session, wait_for_session_completion
-from utils.utils import download_json_attachments, get_cache_key
+from utils.utils import download_json_attachments, get_cache_key, extract_attachments_from_session_data
 from utils.config import FULL_ANALYSIS_TIMEOUT
 
 
@@ -82,8 +82,8 @@ class PlanAgent:
         result = wait_for_session_completion(self._current_session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
         
         # Extract plan data from attachments
-        message_attachments = result.get("message_attachments", [])
-        plan_files = download_json_attachments(message_attachments, "plan")
+        attachments = extract_attachments_from_session_data(result)
+        plan_files = download_json_attachments(attachments, "plan")
         
         if not plan_files:
             raise ValueError("No plan JSON file found in Devin session result")

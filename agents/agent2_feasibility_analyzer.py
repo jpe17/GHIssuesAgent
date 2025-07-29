@@ -4,7 +4,7 @@ import json
 import os
 from typing import Dict
 from core.session_manager import create_devin_session, wait_for_session_completion
-from utils.utils import get_cache_key, download_json_attachments
+from utils.utils import get_cache_key, download_json_attachments, extract_attachments_from_session_data
 from utils.config import FULL_ANALYSIS_TIMEOUT
 
 
@@ -54,7 +54,7 @@ class FeasibilityAnalyzerAgent:
         2. **Complexity Score**: 0-100 (how complex the implementation would be)
         3. **Scope Assessment**: 
            - size: Small/Medium/Large
-           - impact: Local/Module-wide/System-wide
+           - impact: Minimal/Module-wide/System-wide
         4. **Technical Analysis**:
            - estimated_files: List of files that might need changes
            - dependencies: Dependencies that might be affected
@@ -62,7 +62,7 @@ class FeasibilityAnalyzerAgent:
         5. **Confidence**: 0-100 based on clarity and feasibility
         
         Return as JSON with keys: feasibility_score, complexity_score, scope_assessment, 
-        technical_analysis, effort_estimation, confidence
+        technical_analysis, confidence
         
         Save the analysis as "analysis.json" attachment and mark the task as done.
         """
@@ -71,8 +71,8 @@ class FeasibilityAnalyzerAgent:
         result = wait_for_session_completion(session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
         
         # Extract analysis data using utils
-        message_attachments = result.get("message_attachments", [])
-        analysis_files = download_json_attachments(message_attachments, "analysis")
+        attachments = extract_attachments_from_session_data(result)
+        analysis_files = download_json_attachments(attachments, "analysis")
         
         if not analysis_files:
             raise ValueError("No analysis JSON file found in Devin session result")

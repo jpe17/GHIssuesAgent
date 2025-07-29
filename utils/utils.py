@@ -13,7 +13,7 @@ def get_cache_key(repo_url: str) -> str:
     return repo_url.replace("https://github.com/", "").replace("/", "_")
 
 
-def get_issue_file_path(cache_dir: str, repo_url: str, issue_id: int) -> str:
+def get_issue_file_path(cache_dir: str, repo_url: str, issue_id: str) -> str:
     """Generate the file path for a specific issue in cache."""
     repo_key = get_cache_key(repo_url)
     return os.path.join(cache_dir, "issues", repo_key, f"issue_{issue_id}.json")

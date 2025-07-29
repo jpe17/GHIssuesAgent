@@ -3,7 +3,7 @@
   "complexity_score": 25,
   "scope_assessment": {
     "size": "Small",
-    "impact": "Local"
+    "impact": "Minimal"
   },
   "technical_analysis": {
     "estimated_files": [
@@ -23,18 +23,6 @@
       "Video aspect ratio and sizing on different screen sizes",
       "Potential layout shift during video loading"
     ]
-  },
-  "effort_estimation": {
-    "development_time": "2-4 hours",
-    "testing_time": "1-2 hours",
-    "total_estimated_hours": "3-6 hours",
-    "breakdown": {
-      "html_structure": "30 minutes",
-      "css_styling": "1-2 hours",
-      "javascript_enhancements": "1 hour",
-      "responsive_testing": "1-2 hours",
-      "cross_browser_testing": "30 minutes"
-    }
   },
   "confidence": 90,
   "detailed_analysis": {
