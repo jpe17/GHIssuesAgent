@@ -134,39 +134,25 @@ def analyze_single_issue(repo_url: str, issue_id: str) -> dict:
 
 @router.post("/api/analyze-issue")
 async def analyze_issue(request: IssueRequest):
-    """Analyze a specific issue using background function."""
+    """Analyze a specific issue."""
     try:
-        print(f"🎯 Starting background analysis for issue #{request.issue_id}")
+        print(f"🎯 Starting analysis for issue #{request.issue_id}")
         
-        # Use background function for long-running analysis
-        import requests
-        import json
+        # Run the analysis directly
+        result = analyze_single_issue(request.repo_url, request.issue_id)
         
-        background_url = "https://ghi-ssues-agent-9cjjj1j11-joao-esteves-projects.vercel.app/api/background"
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
         
-        payload = {
-            "operation": "analyze_issue",
-            "repo_url": request.repo_url,
-            "issue_id": request.issue_id
+        return {
+            "issue_id": request.issue_id,
+            "status": "completed",
+            "analysis": result.get('analysis'),
+            "plan": result.get('plan')
         }
         
-        response = requests.post(background_url, json=payload, timeout=30)
-        
-        if response.status_code == 200:
-            result = response.json()
-            analysis_result = result.get('result', {})
-            
-            return {
-                "issue_id": request.issue_id,
-                "status": "completed",
-                "analysis": analysis_result.get('feasibility'),
-                "plan": analysis_result.get('plan')
-            }
-        else:
-            raise HTTPException(status_code=response.status_code, detail=f"Background function failed: {response.text}")
-        
     except Exception as e:
-        print(f"💥 Background analysis failed for issue #{request.issue_id}: {str(e)}")
+        print(f"❌ Analysis failed for issue #{request.issue_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/analyze-multiple-issues")
