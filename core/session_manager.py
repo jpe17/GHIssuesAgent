@@ -93,8 +93,8 @@ def cancel_session(session_id: str, max_attempts: int = 30) -> bool:
     return False
 
 
-def _wait_for_session_with_custom_check(session_id: str, timeout: int, show_live: bool, custom_check=None) -> dict:
-    """Helper function to wait for session completion with optional custom check."""
+def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
+    """Wait for session to complete and return result."""
     start_time = time.time()
     last_message_count = 0
     
@@ -105,9 +105,6 @@ def _wait_for_session_with_custom_check(session_id: str, timeout: int, show_live
             if show_live:
                 last_message_count = display_live_messages(session_id, last_message_count)
             
-            if custom_check and custom_check(session_data):
-                return session_data
-            
             if session_data.get("status_enum") in ["completed", "failed", "stopped", "blocked"]:
                 return session_data
                 
@@ -117,11 +114,6 @@ def _wait_for_session_with_custom_check(session_id: str, timeout: int, show_live
         time.sleep(10)
     
     return {"error": "timeout"}
-
-
-def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
-    """Wait for session to complete and return result."""
-    return _wait_for_session_with_custom_check(session_id, timeout, show_live)
 
 
 def extract_pr_url_from_session(session_result: dict) -> str | None:
@@ -222,9 +214,26 @@ def extract_json_from_session(result: dict, name_filter: str = None, return_sing
 
 def wait_for_execution_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
     """Wait for execution session to complete, stopping early if PR is detected."""
-    def pr_check(session_data):
-        if extract_pr_url_from_session(session_data):
-            return True
-        return False
+    start_time = time.time()
+    last_message_count = 0
     
-    return _wait_for_session_with_custom_check(session_id, timeout, show_live, pr_check)
+    while time.time() - start_time < timeout:
+        try:
+            session_data = get_session_details(session_id)
+            
+            if show_live:
+                last_message_count = display_live_messages(session_id, last_message_count)
+            
+            # Check if PR URL is found in messages (early termination)
+            if extract_pr_url_from_session(session_data):
+                return session_data
+            
+            if session_data.get("status_enum") in ["completed", "failed", "stopped", "blocked"]:
+                return session_data
+                
+        except requests.exceptions.RequestException:
+            pass
+        
+        time.sleep(10)
+    
+    return {"error": "timeout"}
