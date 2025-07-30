@@ -30,25 +30,14 @@ def check_cache(cache_file: str) -> Optional[Dict]:
 
 def save_to_cache(cache_file: str, data: Dict) -> None:
     """Save data to cache file."""
-    try:
-        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-        with open(cache_file, 'w') as f:
-            json.dump(data, f, indent=2)
-    except (OSError, IOError):
-        # Handle read-only filesystem errors gracefully
-        print(f"⚠️  Could not save to cache (read-only filesystem): {cache_file}")
-        return
+    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+    with open(cache_file, 'w') as f:
+        json.dump(data, f, indent=2)
 
 
-def safe_makedirs(path: str) -> bool:
-    """Safely create directories, handling read-only filesystem."""
-    try:
-        os.makedirs(path, exist_ok=True)
-        return True
-    except (OSError, IOError):
-        # Handle read-only filesystem errors gracefully
-        print(f"⚠️  Could not create directory (read-only filesystem): {path}")
-        return False
+def makedir(path: str) -> None:
+    """Create directories."""
+    os.makedirs(path, exist_ok=True)
 
 
 def prepare_issue_data(issue: Dict) -> Dict:

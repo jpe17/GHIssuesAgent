@@ -22,8 +22,18 @@ from utils.utils import get_issue_file_path
 
 router = APIRouter()
 
-# Sequential lock for Devin API calls - only 1 at a time
+# Rate limiting for Devin API calls
+import asyncio
+from collections import deque
+from datetime import datetime, timedelta
+
+# Track Devin API calls for rate limiting
+devin_api_calls = deque()
 devin_api_lock = threading.Lock()
+MAX_DEVIN_CALLS_PER_MINUTE = 10 
+
+# Global thread pool for individual issue processing
+individual_issue_executor = ThreadPoolExecutor(max_workers=6, thread_name_prefix="issue_worker")
 
 # Request models
 class RepoRequest(BaseModel):
@@ -38,35 +48,42 @@ class MultiIssueRequest(BaseModel):
     issue_ids: list[str]
 
 def safe_devin_api_call(func, *args, **kwargs):
-    """Make a Devin API call - SEQUENTIAL ONLY to avoid rate limits."""
-    with devin_api_lock:  # Only 1 Devin API call at a time across all threads
-        for attempt in range(3):
-            try:
-                print(f"🔄 Making Devin API call (attempt {attempt + 1}/3)")
-                result = func(*args, **kwargs)
-                print(f"✅ Devin API call successful")
-                return result
-            except Exception as e:
-                if "429" in str(e) or "Too Many Requests" in str(e) or "devin.ai" in str(e):
-                    wait_time = 15 * (attempt + 1)  # 15s, 30s, 45s
-                    print(f"⚠️  Devin API rate limited, waiting {wait_time}s...")
-                    time.sleep(wait_time)
-                    if attempt == 2:  # Last attempt
-                        raise Exception(f"Devin API rate limited after 3 attempts: {str(e)}")
-                else:
-                    raise
+    """Make a Devin API call with smart rate limiting."""
+    with devin_api_lock:
+        # Clean old calls (older than 1 minute)
+        now = datetime.now()
+        while devin_api_calls and (now - devin_api_calls[0]) > timedelta(minutes=1):
+            devin_api_calls.popleft()
         
-def safe_github_api_call(func, *args, **kwargs):
-    """Make a GitHub API call with basic retry."""
-    for attempt in range(2):
+        # Check if we're at rate limit
+        if len(devin_api_calls) >= MAX_DEVIN_CALLS_PER_MINUTE:
+            # Wait until we can make another call
+            oldest_call = devin_api_calls[0]
+            wait_time = 60 - (now - oldest_call).total_seconds()
+            if wait_time > 0:
+                print(f"⚠️  Rate limit reached, waiting {wait_time:.1f}s...")
+                time.sleep(wait_time)
+        
+        # Record this call
+        devin_api_calls.append(now)
+    
+    # Now make the actual API call
+    for attempt in range(3):
         try:
-            return func(*args, **kwargs)
+            print(f"🔄 Making Devin API call (attempt {attempt + 1}/3)")
+            result = func(*args, **kwargs)
+            print(f"✅ Devin API call successful")
+            return result
         except Exception as e:
-            if "429" in str(e) and attempt == 0:
-                print(f"⚠️  GitHub API rate limited, waiting 5s...")
-                time.sleep(5)
+            if "429" in str(e) or "Too Many Requests" in str(e) or "devin.ai" in str(e):
+                wait_time = 15 * (attempt + 1)  # 15s, 30s, 45s
+                print(f"⚠️  Devin API rate limited, waiting {wait_time}s...")
+                time.sleep(wait_time)
+                if attempt == 2:  # Last attempt
+                    raise Exception(f"Devin API rate limited after 3 attempts: {str(e)}")
             else:
                 raise
+        
 
 @router.get("/", response_class=HTMLResponse)
 async def get_index():
@@ -81,7 +98,7 @@ async def fetch_issues(request: RepoRequest):
         print(f"🔄 Fetching issues from: {request.repo_url}")
         
         agent = IssueFetcherAgent()
-        issues_data = safe_github_api_call(agent.fetch_and_cache_issues, request.repo_url)
+        issues_data = safe_devin_api_call(agent.fetch_and_cache_issues, request.repo_url)
         
         # Convert to frontend format
         issues = [{
@@ -141,25 +158,34 @@ def process_issue(repo_url: str, issue_id: str, is_execution: bool = False):
             analysis = None
             plan = None
             
-            # Get feasibility analysis
-            if check_cache(feasibility_cache):
-                print(f"✅ Using cached feasibility for issue #{issue_id}")
-                with open(feasibility_cache, 'r') as f:
-                    analysis = json.load(f)
-            else:
-                print(f"🔄 Running Agent 2 (feasibility) for issue #{issue_id}")
-                agent2 = FeasibilityAnalyzerAgent()
-                analysis = safe_devin_api_call(agent2.analyze_issue_feasibility, issue, repo_url)
+            # Run feasibility analysis and plan generation in parallel
+            def run_feasibility():
+                if check_cache(feasibility_cache):
+                    print(f"✅ Using cached feasibility for issue #{issue_id}")
+                    with open(feasibility_cache, 'r') as f:
+                        return json.load(f)
+                else:
+                    print(f"🔄 Running Agent 2 (feasibility) for issue #{issue_id}")
+                    agent2 = FeasibilityAnalyzerAgent()
+                    return safe_devin_api_call(agent2.analyze_issue_feasibility, issue, repo_url)
             
-            # Get plan
-            if check_cache(plan_cache):
-                print(f"✅ Using cached plan for issue #{issue_id}")
-                with open(plan_cache, 'r') as f:
-                    plan = json.load(f)
-            else:
-                print(f"🔄 Running Agent 3 (planning) for issue #{issue_id}")
-                agent3 = PlanAgent()
-                plan = safe_devin_api_call(agent3.review_files_and_plan, issue, repo_url)
+            def run_plan():
+                if check_cache(plan_cache):
+                    print(f"✅ Using cached plan for issue #{issue_id}")
+                    with open(plan_cache, 'r') as f:
+                        return json.load(f)
+                else:
+                    print(f"🔄 Running Agent 3 (planning) for issue #{issue_id}")
+                    agent3 = PlanAgent()
+                    return safe_devin_api_call(agent3.review_files_and_plan, issue, repo_url)
+            
+            # Execute both in parallel
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                feasibility_future = executor.submit(run_feasibility)
+                plan_future = executor.submit(run_plan)
+                
+                analysis = feasibility_future.result()
+                plan = plan_future.result()
             
             return {
                 "issue_id": issue_id,
@@ -185,8 +211,8 @@ async def analyze_multiple_issues(request: MultiIssueRequest):
     """Analyze multiple issues with parallelization."""
     print(f"🔍 Analyzing {len(request.issue_ids)} issues")
     
-    # Remove staggered delays - let the lock handle sequencing
-    with ThreadPoolExecutor(max_workers=min(3, len(request.issue_ids))) as executor:
+    # Use more workers for better parallelization
+    with ThreadPoolExecutor(max_workers=min(5, len(request.issue_ids))) as executor:
         results = list(executor.map(lambda issue_id: process_issue(request.repo_url, issue_id, is_execution=False), request.issue_ids))
     
     print(f"✅ Completed analysis of {len(results)} issues")
@@ -205,8 +231,8 @@ async def execute_multiple_issues(request: MultiIssueRequest):
     """Execute multiple issues with parallelization."""
     print(f"🚀 Executing {len(request.issue_ids)} issues")
     
-    # Remove staggered delays - let the lock handle sequencing  
-    with ThreadPoolExecutor(max_workers=min(2, len(request.issue_ids))) as executor:
+    # Use more workers for better parallelization
+    with ThreadPoolExecutor(max_workers=min(3, len(request.issue_ids))) as executor:
         results = list(executor.map(lambda issue_id: process_issue(request.repo_url, issue_id, is_execution=True), request.issue_ids))
     
     print(f"✅ Completed execution of {len(results)} issues")

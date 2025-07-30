@@ -4,7 +4,9 @@ const App = {
         currentRepoUrl: '',
         issues: [],
         selectedIssues: new Set(),
-        currentIssueId: null
+        currentIssueId: null,
+        isAnalysisRunning: false,
+        isExecutionRunning: false
     },
 
     // === MAIN API FUNCTIONS ===
@@ -50,9 +52,16 @@ const App = {
     },
 
     async analyzeSingle(issueId) {
+        // Check if analysis is already running
+        if (this.state.isAnalysisRunning) {
+            this.showMessage('Analysis already in progress. Please wait.', 'error');
+            return;
+        }
+
         const btn = document.getElementById(`play-${issueId}`);
         const row = btn.closest('.issue-item');
         
+        this.state.isAnalysisRunning = true;
         this.setLoading(btn, 'Analyzing...');
         row.classList.add('analyzing');
         
@@ -80,18 +89,26 @@ const App = {
             this.showMessage('Failed to analyze issue: ' + error.message, 'error');
             this.hideSection('analysisSection');
         } finally {
+            this.state.isAnalysisRunning = false;
             this.clearLoading(btn, 'Analyze');
             row.classList.remove('analyzing');
         }
     },
 
     async analyzeMultiple() {
+        // Check if analysis is already running
+        if (this.state.isAnalysisRunning) {
+            this.showMessage('Analysis already in progress. Please wait.', 'error');
+            return;
+        }
+
         if (this.state.selectedIssues.size === 0) {
             this.showMessage('Please select at least one issue', 'error');
             return;
         }
 
         const btn = document.getElementById('analyzeAllBtn');
+        this.state.isAnalysisRunning = true;
         this.setLoading(btn, 'Analyzing...');
         
         // Update all selected rows
@@ -129,6 +146,7 @@ const App = {
             this.showMessage('Failed to analyze issues: ' + error.message, 'error');
             this.hideElement('multipleAnalysisLoading');
         } finally {
+            this.state.isAnalysisRunning = false;
             this.clearLoading(btn, '<span>🔍</span> Analyze Selected');
             
             // Restore all rows
@@ -142,6 +160,12 @@ const App = {
     },
 
     async execute() {
+        // Check if execution is already running
+        if (this.state.isExecutionRunning) {
+            this.showMessage('Execution already in progress. Please wait.', 'error');
+            return;
+        }
+
         if (!this.state.currentIssueId) {
             this.showMessage('No issue selected for execution', 'error');
             return;
@@ -158,6 +182,7 @@ const App = {
         document.getElementById('executionSection').scrollIntoView({ behavior: 'smooth' });
 
         const btn = document.getElementById('executeBtn');
+        this.state.isExecutionRunning = true;
         this.setLoading(btn, 'Executing...');
 
         try {
@@ -219,11 +244,18 @@ const App = {
                 </div>`;
             btn.innerHTML = '❌ Failed';
         } finally {
+            this.state.isExecutionRunning = false;
             btn.disabled = false;
         }
     },
 
     async executeSingle(issueId) {
+        // Check if execution is already running
+        if (this.state.isExecutionRunning) {
+            this.showMessage('Execution already in progress. Please wait.', 'error');
+            return;
+        }
+
         // Set current issue for execution
         this.state.currentIssueId = issueId;
         
@@ -238,6 +270,7 @@ const App = {
         document.getElementById('executionSection').scrollIntoView({ behavior: 'smooth' });
 
         const btn = document.querySelector(`[onclick="executeSingleIssue('${issueId}')"]`);
+        this.state.isExecutionRunning = true;
         this.setLoading(btn, 'Executing...');
 
         try {
@@ -304,6 +337,7 @@ const App = {
                 </div>`;
             btn.innerHTML = '❌ Failed';
         } finally {
+            this.state.isExecutionRunning = false;
             btn.disabled = false;
         }
     },
@@ -713,6 +747,11 @@ const App = {
         setTimeout(() => message.remove(), 5000);
     },
 
+
+
+
+
+
     startExecutionProgress() {
         const steps = document.querySelectorAll('.step');
         const progressFill = document.querySelector('.progress-fill');
@@ -860,6 +899,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchIssues();
         }
     });
+    
+
     
     // Initialize global variables for compatibility
     window.currentRepoUrl = '';

@@ -1,6 +1,6 @@
 {
-  "feasibility_score": 95,
-  "complexity_score": 25,
+  "feasibility_score": 85,
+  "complexity_score": 35,
   "scope_assessment": {
     "size": "Small",
     "impact": "Module-wide"
@@ -14,16 +14,14 @@
     "dependencies": [
       "HTML5 video element support",
       "CSS custom properties (already implemented)",
-      "IntersectionObserver API (already used)",
-      "Existing fade-in animation system",
-      "Glass-morphism design tokens"
+      "JavaScript event handling (already implemented)",
+      "Existing glass-morphism design system"
     ],
     "risks": [
-      "16MB video file may impact page load performance on slow connections",
-      "Video autoplay policies vary across browsers",
-      "Mobile data usage concerns with large video file",
-      "Potential layout shift during video loading",
-      "Video format compatibility (.mov) across all browsers"
+      "Video file size (16MB) may impact page load performance",
+      "Mobile responsiveness for video controls",
+      "Browser compatibility for video formats (.mov)",
+      "Potential layout shift when video loads"
     ]
   },
   "confidence": 90,

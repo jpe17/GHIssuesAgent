@@ -2,7 +2,7 @@
 
 import os
 from typing import List, Dict
-from utils.utils import get_cache_key, save_to_cache, check_cache, safe_makedirs
+from utils.utils import get_cache_key, save_to_cache, check_cache, makedir
 from core.session_manager import create_devin_session, wait_for_session_completion, extract_json_from_session
 from utils.config import ISSUES_FETCH_TIMEOUT
 
@@ -12,9 +12,9 @@ class IssueFetcherAgent:
     
     def __init__(self, cache_dir: str = "cache"):
         self.cache_dir = cache_dir
-        safe_makedirs(cache_dir)
+        makedir(cache_dir)
         self.issues_dir = os.path.join(cache_dir, "issues")
-        safe_makedirs(self.issues_dir)
+        makedir(self.issues_dir)
     
     def fetch_and_cache_issues(self, repo_url: str) -> List[Dict]:
         """Fetch GitHub issues and store them in cache."""
@@ -52,7 +52,7 @@ class IssueFetcherAgent:
         # Download and save issue files
         repo_key = get_cache_key(repo_url)
         repo_issues_dir = os.path.join(self.issues_dir, repo_key)
-        safe_makedirs(repo_issues_dir)
+        makedir(repo_issues_dir)
         
         downloaded_files = extract_json_from_session(result, "issue_", return_single=False)
         
