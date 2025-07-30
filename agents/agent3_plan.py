@@ -7,7 +7,6 @@ from utils.utils import (
     get_cache_file_path
 )
 from core.session_manager import create_devin_session, wait_for_session_completion, extract_json_from_session
-from utils.config import FULL_ANALYSIS_TIMEOUT
 
 
 class PlanAgent:
@@ -65,7 +64,7 @@ class PlanAgent:
         """
         
         session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(session_id, timeout=FULL_ANALYSIS_TIMEOUT, show_live=False)
+        result = wait_for_session_completion(session_id, show_live=False)
         plan_data = extract_json_from_session(result, "plan")
         
         # Add issue metadata and cache

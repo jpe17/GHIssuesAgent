@@ -59,3 +59,13 @@ def get_cache_file_path(cache_dir: str, repo_url: str, analysis_type: str, issue
     """Generate cache file path for analysis results."""
     repo_key = get_cache_key(repo_url)
     return os.path.join(cache_dir, f"{analysis_type}_{repo_key}_{issue_number}.json")
+
+def load_issue(repo_url: str, issue_id: str) -> Dict:
+    """Load issue from cache."""
+    issue_file_path = get_issue_file_path("cache", repo_url, issue_id)
+    if not os.path.exists(issue_file_path):
+        raise FileNotFoundError(f"Issue #{issue_id} not found in cache")
+    
+    with open(issue_file_path, 'r') as f:
+        return json.load(f)
+

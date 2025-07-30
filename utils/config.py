@@ -14,9 +14,10 @@ DEVIN_API_BASE = "https://api.devin.ai/v1"
 if not DEVIN_API_KEY:
     raise ValueError("DEVIN_API_KEY environment variable is not set. Please set it in your .env file.")
 
-# Timeout configurations
-SCAN_TIMEOUT = 300  # 5 minutes for repository scanning (deprecated)
-TARGETED_ANALYSIS_TIMEOUT = 600  # 10 minutes for targeted analysis (deprecated)
-FULL_ANALYSIS_TIMEOUT = 600  # 10 minutes for full repository analysis
-EXECUTION_TIMEOUT = 1800  # 30 minutes for execution and pushing (much longer for complex tasks)
-ISSUES_FETCH_TIMEOUT = 120  # 2 minutes for fetching issues (should be much faster) 
+# Timeout configurations for different operations
+ISSUES_FETCH_TIMEOUT = 120     # 2 minutes for fetching issues
+FULL_ANALYSIS_TIMEOUT = 900    # 15 minutes for analysis and planning (increased)
+EXECUTION_TIMEOUT = 1800       # 30 minutes for execution and PR creation
+
+# Rate limiting configuration
+MIN_SECONDS_BETWEEN_CALLS = 5  # Minimum seconds between API calls 

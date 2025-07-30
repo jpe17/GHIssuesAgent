@@ -4,7 +4,6 @@ import os
 from typing import List, Dict
 from utils.utils import get_cache_key, save_to_cache, check_cache, makedir
 from core.session_manager import create_devin_session, wait_for_session_completion, extract_json_from_session
-from utils.config import ISSUES_FETCH_TIMEOUT
 
 
 class IssueFetcherAgent:
@@ -47,7 +46,7 @@ class IssueFetcherAgent:
         """
         
         session_id = create_devin_session(prompt, repo_url)
-        result = wait_for_session_completion(session_id, timeout=ISSUES_FETCH_TIMEOUT)
+        result = wait_for_session_completion(session_id)
         
         # Download and save issue files
         repo_key = get_cache_key(repo_url)

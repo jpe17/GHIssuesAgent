@@ -4,33 +4,44 @@ import time
 import requests
 import json
 import re
-from utils.config import DEVIN_API_BASE, DEVIN_API_KEY
+import threading
+from utils.config import (
+    DEVIN_API_BASE, 
+    DEVIN_API_KEY,
+    FULL_ANALYSIS_TIMEOUT,
+    EXECUTION_TIMEOUT,
+    ISSUES_FETCH_TIMEOUT,
+    MIN_SECONDS_BETWEEN_CALLS
+)
 
 
 def create_devin_session(prompt: str, repo_url: str = None) -> str:
     """Create a Devin session and return session ID."""
-    payload = {"prompt": prompt}
-    if repo_url:
-        payload["repository_url"] = repo_url
+    def _create_session():
+        payload = {"prompt": prompt}
+        if repo_url:
+            payload["repository_url"] = repo_url
+        
+        headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
+        
+        response = requests.post(f"{DEVIN_API_BASE}/sessions", json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data["session_id"]
     
-    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
-    
-    response = requests.post(f"{DEVIN_API_BASE}/sessions", json=payload, headers=headers)
-    response.raise_for_status()
-    data = response.json()
-    return data["session_id"]
+    return safe_devin_api_call(_create_session, timeout=30)
 
 
 def get_session_details(session_id: str) -> dict:
     """Get detailed information about a Devin session."""
-    headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
-    
-    try:
+    def _get_details():
+        headers = {"Authorization": f"Bearer {DEVIN_API_KEY}"}
         response = requests.get(f"{DEVIN_API_BASE}/session/{session_id}", headers=headers)
         response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException:
-        return {}
+    
+    try:
+        return safe_devin_api_call(_get_details, timeout=30)
     except Exception:
         return {}
 
@@ -93,8 +104,11 @@ def cancel_session(session_id: str, max_attempts: int = 30) -> bool:
     return False
 
 
-def wait_for_session_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
+def wait_for_session_completion(session_id: str, timeout: int = None, show_live: bool = False) -> dict:
     """Wait for session to complete and return result."""
+    if timeout is None:
+        timeout = FULL_ANALYSIS_TIMEOUT
+    
     start_time = time.time()
     last_message_count = 0
     
@@ -212,8 +226,11 @@ def extract_json_from_session(result: dict, name_filter: str = None, return_sing
     return downloaded_files
 
 
-def wait_for_execution_completion(session_id: str, timeout: int = 300, show_live: bool = False) -> dict:
+def wait_for_execution_completion(session_id: str, timeout: int = None, show_live: bool = False) -> dict:
     """Wait for execution session to complete, stopping early if PR is detected."""
+    if timeout is None:
+        timeout = EXECUTION_TIMEOUT
+    
     start_time = time.time()
     last_message_count = 0
     
@@ -237,3 +254,56 @@ def wait_for_execution_completion(session_id: str, timeout: int = 300, show_live
         time.sleep(10)
     
     return {"error": "timeout"}
+
+
+# Simple rate limiting for all Devin API calls
+last_devin_api_call = 0
+devin_api_lock = threading.Lock()
+
+def safe_devin_api_call(func, *args, timeout=None, **kwargs):
+    """Make a Devin API call with rate limiting and configurable timeout."""
+    global last_devin_api_call
+    
+    # Apply rate limiting
+    with devin_api_lock:
+        now = time.time()
+        time_since_last_call = now - last_devin_api_call
+        
+        if time_since_last_call < MIN_SECONDS_BETWEEN_CALLS:
+            wait_time = MIN_SECONDS_BETWEEN_CALLS - time_since_last_call
+            print(f"⚠️  Rate limiting: waiting {wait_time:.1f}s...")
+            time.sleep(wait_time)
+        
+        last_devin_api_call = time.time()
+    
+    # Determine appropriate timeout based on function name if not provided
+    if timeout is None:
+        func_name = func.__name__ if hasattr(func, '__name__') else str(func)
+        if 'fetch' in func_name.lower() or 'issue' in func_name.lower():
+            timeout = ISSUES_FETCH_TIMEOUT
+        elif 'execute' in func_name.lower() or 'push' in func_name.lower():
+            timeout = EXECUTION_TIMEOUT
+        else:
+            timeout = FULL_ANALYSIS_TIMEOUT
+    
+    print(f"🔄 Making Devin API call with {timeout}s timeout")
+    
+    # Make the actual API call with retry logic
+    for attempt in range(3):
+        try:
+            print(f"🔄 Attempt {attempt + 1}/3")
+            result = func(*args, **kwargs)
+            print(f"✅ Devin API call successful")
+            return result
+        except Exception as e:
+            if "429" in str(e) or "Too Many Requests" in str(e):
+                wait_time = 15 * (attempt + 1)
+                print(f"⚠️  API rate limited, waiting {wait_time}s...")
+                time.sleep(wait_time)
+                if attempt == 2:
+                    raise Exception(f"API rate limited after 3 attempts: {str(e)}")
+            else:
+                print(f"❌ API call failed: {str(e)}")
+                if attempt == 2:
+                    raise
+                time.sleep(5)  # Brief pause before retry

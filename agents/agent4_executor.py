@@ -3,7 +3,6 @@
 import json
 from typing import Dict
 from core.session_manager import create_devin_session, wait_for_execution_completion, extract_pr_url_from_session
-from utils.config import EXECUTION_TIMEOUT
 
 
 class ExecutorAgent:
@@ -32,7 +31,7 @@ class ExecutorAgent:
         """
         
         session_id = create_devin_session(execution_prompt, repo_url)
-        result = wait_for_execution_completion(session_id, timeout=EXECUTION_TIMEOUT, show_live=True)
+        result = wait_for_execution_completion(session_id, show_live=True)
         pr_url = extract_pr_url_from_session(result)
         
         return {

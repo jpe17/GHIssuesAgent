@@ -11,7 +11,7 @@ from queue import Queue
 # Add the parent directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agents.agent1_issue_fetcher import IssueFetcherAgent
+
 from agents.agent2_feasibility_analyzer import FeasibilityAnalyzerAgent
 from agents.agent3_plan import PlanAgent
 from agents.agent4_executor import ExecutorAgent
@@ -19,22 +19,14 @@ from utils.utils import get_issue_file_path
 from core.session_manager import cancel_session
 
 
-def run_agent_2(agent2, issue, repo_url, result_queue):
-    """Run Agent 2 in a separate thread."""
+def run_parallel_analysis(repo_url, issue_id, result_queue):
+    """Run parallel analysis using the centralized function."""
     try:
-        analysis = agent2.analyze_issue_feasibility(issue, repo_url)
-        result_queue.put(("agent2", analysis, None))
+        from core.workflows import process_issue_parallel
+        result = process_issue_parallel(repo_url, issue_id)
+        result_queue.put(("parallel_analysis", result, None))
     except Exception as e:
-        result_queue.put(("agent2", None, e))
-
-
-def run_agent_3(agent3, issue, repo_url, result_queue):
-    """Run Agent 3 in a separate thread."""
-    try:
-        plan = agent3.review_files_and_plan(issue, repo_url)
-        result_queue.put(("agent3", plan, None))
-    except Exception as e:
-        result_queue.put(("agent3", None, e))
+        result_queue.put(("parallel_analysis", None, e))
 
 
 def check_cache_exists(repo_url):
@@ -50,10 +42,14 @@ def fetch_and_display_issues(repo_url):
     
     # Fetch issues if needed
     if not check_cache_exists(repo_url):
-        agent1 = IssueFetcherAgent()
-        issues = agent1.fetch_and_cache_issues(repo_url)
-        if not issues:
-            print("❌ Failed to fetch issues")
+        from core.workflows import fetch_repository_issues
+        try:
+            issues = fetch_repository_issues(repo_url)
+            if not issues:
+                print("❌ Failed to fetch issues")
+                return None
+        except Exception as e:
+            print(f"❌ Failed to fetch issues: {e}")
             return None
     else:
         print("✅ Using cached issues")
